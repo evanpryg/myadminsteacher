@@ -118,7 +118,7 @@ function renderTabelInputHarian() {
         html += `<tr class="hover:bg-slate-50/80 border-b border-slate-100">
             <td class="py-2 px-2 text-center text-slate-400 text-xs w-8">${i + 1}</td>
             <td class="py-2 px-2 font-bold text-slate-700 text-xs">${siswa.nama}</td>
-            <td class="py-2 px-2 w-20">
+            <td class="py-2 px-2 w-13">
                 <select onchange="pilihStatusHarian(${i}, this.value)" class="w-full rounded-md border-2 px-1 py-1 text-[10px] font-bold cursor-pointer focus:outline-none transition-all appearance-none text-center ${dropdownColor}" id="sel-presensi-${i}">
                     <option value="H" ${status === 'H' ? 'selected' : ''}>Hadir</option>
                     <option value="I" ${status === 'I' ? 'selected' : ''}>Izin</option>

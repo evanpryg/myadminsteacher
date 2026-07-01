@@ -578,7 +578,7 @@ async function muatDmSiswa() {
                 tbody.innerHTML = html;
             }
         }
-        if (info) info.textContent = `Total: ${data.length} siswa dari ${Object.keys(grouped || {}).length || kelasAmpu.length} kelas`;
+        if (info) info.textContent = `Total: ${data.length} siswa dari ${kelasAmpu.length} kelas`;
     } catch (err) {
         if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-rose-500 font-bold">Gagal: ${err.message}</td></tr>`;
     }
