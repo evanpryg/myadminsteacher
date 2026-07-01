@@ -62,11 +62,11 @@ function _buildDashboardHTML(data) {
             <div class="space-y-5">${_buildAgenda(data.agenda, data.hariIni)}</div>
             <div class="space-y-5">${_buildTodo(data.todos)}</div>
         </div>
-        ${_buildQuickLinks(data.quickLinks)}
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <div class="space-y-5">${_buildPerhatian(data.siswaPerluPerhatian)}</div>
             <div class="space-y-5">${_buildApresiasi(data.apresiasi)}</div>
-        </div>`;
+        </div>
+        ${_buildQuickLinks(data.quickLinks)}`;
 }
 
 function _buildHeader(profil) {

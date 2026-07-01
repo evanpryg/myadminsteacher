@@ -110,9 +110,23 @@ function renderTabelInputHarian() {
     dataPresensiAktif.forEach((siswa, i) => {
         let status = siswa.tm?.[tmInputAktif] || '';
         if (status === '' && !dataPresensiAktif[0].tanggal[tmInputAktif]) { status = 'H'; if (!siswa.tm) siswa.tm = {}; siswa.tm[tmInputAktif] = 'H'; adaPerubahanPresensi = true; }
-        html += `<tr class="hover:bg-slate-50/80 border-b border-slate-100"><td class="py-3 px-4 text-center text-slate-400 text-xs">${i + 1}</td><td class="py-3 px-4 font-bold text-slate-700 text-sm">${siswa.nama}</td><td class="py-3 px-4 text-center"><div class="inline-flex rounded-xl shadow-sm border border-slate-200 overflow-hidden text-xs font-bold">
-            ${_btnH(i, 'H', status)}${_btnH(i, 'I', status)}${_btnH(i, 'S', status)}${_btnH(i, 'A', status)}
-        </div></td></tr>`;
+        
+        // Colored dropdown style based on status
+        const colorMap = { H: 'bg-emerald-100 border-emerald-400 text-emerald-800', I: 'bg-sky-100 border-sky-400 text-sky-800', S: 'bg-amber-100 border-amber-400 text-amber-800', A: 'bg-rose-100 border-rose-400 text-rose-800' };
+        const dropdownColor = colorMap[status] || 'bg-slate-50 border-slate-200 text-slate-600';
+        
+        html += `<tr class="hover:bg-slate-50/80 border-b border-slate-100">
+            <td class="py-2.5 px-3 text-center text-slate-400 text-xs">${i + 1}</td>
+            <td class="py-2.5 px-3 font-bold text-slate-700 text-sm">${siswa.nama}</td>
+            <td class="py-2.5 px-3 text-center">
+                <select onchange="pilihStatusHarian(${i}, this.value)" class="rounded-lg border-2 px-3 py-1.5 text-xs font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${dropdownColor}" id="sel-presensi-${i}">
+                    <option value="H" ${status === 'H' ? 'selected' : ''}>✅ Hadir</option>
+                    <option value="I" ${status === 'I' ? 'selected' : ''}>📋 Ijin</option>
+                    <option value="S" ${status === 'S' ? 'selected' : ''}>🤒 Sakit</option>
+                    <option value="A" ${status === 'A' ? 'selected' : ''}>❌ Alfa</option>
+                </select>
+            </td>
+        </tr>`;
     });
     tbody.innerHTML = html;
     updateStatusSimpanPresensi();
@@ -126,10 +140,16 @@ function _btnH(idx, kode, cur) {
 }
 
 function pilihStatusHarian(idx, kode) {
-    const cur = dataPresensiAktif[idx].tm[tmInputAktif];
-    dataPresensiAktif[idx].tm[tmInputAktif] = cur === kode ? '' : kode;
+    dataPresensiAktif[idx].tm[tmInputAktif] = kode;
     adaPerubahanPresensi = true;
-    renderTabelInputHarian();
+    
+    // Update dropdown color immediately without full re-render
+    const sel = document.getElementById('sel-presensi-' + idx);
+    if (sel) {
+        const colorMap = { H: 'bg-emerald-100 border-emerald-400 text-emerald-800', I: 'bg-sky-100 border-sky-400 text-sky-800', S: 'bg-amber-100 border-amber-400 text-amber-800', A: 'bg-rose-100 border-rose-400 text-rose-800' };
+        sel.className = 'rounded-lg border-2 px-3 py-1.5 text-xs font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ' + (colorMap[kode] || 'bg-slate-50 border-slate-200 text-slate-600');
+    }
+    updateStatusSimpanPresensi();
 }
 
 function renderTabelRekapPresensi() {
