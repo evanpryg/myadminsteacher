@@ -371,9 +371,53 @@ async function getDashboardData() {
         profil: { nama: settings.GS_NAMA_GURU || 'Guru', sekolah: settings.GS_NAMA_SEKOLAH || '', tahunAjaran: ta, semester: sem, kkm },
         stats: { jumlahSiswa, jumlahKelas, rataRataNilai, rataRataKehadiran: null },
         agenda, hariIni, todos, quickLinks,
-        siswaPerluPerhatian: [],
-        apresiasi: { academicStar: null, growthChampion: null, activeLearner: null }
+        siswaPerluPerhatian: _hitungSiswaPerluPerhatian(siswaYangDiampu, nilai, kkm),
+        apresiasi: _hitungApresiasi(siswaYangDiampu, nilai, kkm)
     };
+}
+
+// ── Dashboard Helpers: Perhatian & Apresiasi ────────────────
+function _hitungSiswaPerluPerhatian(siswa, nilaiData, kkm) {
+    if (!siswa || siswa.length === 0 || !nilaiData) return [];
+    const nilaiMap = {};
+    (nilaiData || []).forEach(n => { nilaiMap[n.siswa_id] = n; });
+
+    const hasil = [];
+    siswa.forEach(s => {
+        const n = nilaiMap[s.id];
+        if (!n) return;
+        const alasan = [];
+        if (n.nilai_akhir && n.nilai_akhir < kkm) {
+            alasan.push({ tipe: 'nilai', label: 'Nilai ' + n.nilai_akhir + ' (< KKM ' + kkm + ')' });
+        }
+        if (alasan.length > 0) {
+            hasil.push({ nama: s.nama_siswa, kelas: s.kelas, alasan });
+        }
+    });
+    return hasil.slice(0, 5); // Max 5
+}
+
+function _hitungApresiasi(siswa, nilaiData, kkm) {
+    const result = { academicStar: null, growthChampion: null, activeLearner: null };
+    if (!siswa || siswa.length === 0 || !nilaiData || nilaiData.length === 0) return result;
+
+    const nilaiMap = {};
+    (nilaiData || []).forEach(n => { nilaiMap[n.siswa_id] = n; });
+
+    // Academic Star: siswa dengan nilai tertinggi
+    let topNilai = 0, topSiswa = null;
+    siswa.forEach(s => {
+        const n = nilaiMap[s.id];
+        if (n && n.nilai_akhir && n.nilai_akhir > topNilai) {
+            topNilai = n.nilai_akhir;
+            topSiswa = s;
+        }
+    });
+    if (topSiswa && topNilai > 0) {
+        result.academicStar = { nama: topSiswa.nama_siswa, kelas: topSiswa.kelas, nilai: topNilai };
+    }
+
+    return result;
 }
 
 // ── PENGATURAN DATA (for Pengaturan page) ───────────────────

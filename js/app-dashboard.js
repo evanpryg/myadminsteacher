@@ -62,7 +62,11 @@ function _buildDashboardHTML(data) {
             <div class="space-y-5">${_buildAgenda(data.agenda, data.hariIni)}</div>
             <div class="space-y-5">${_buildTodo(data.todos)}</div>
         </div>
-        ${_buildQuickLinks(data.quickLinks)}`;
+        ${_buildQuickLinks(data.quickLinks)}
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div class="space-y-5">${_buildPerhatian(data.siswaPerluPerhatian)}</div>
+            <div class="space-y-5">${_buildApresiasi(data.apresiasi)}</div>
+        </div>`;
 }
 
 function _buildHeader(profil) {
@@ -109,15 +113,45 @@ function _buildAgenda(agenda, hariIni) {
     if (!agenda || agenda.length === 0) {
         body = `<div class="py-10 text-center"><div class="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto"><i data-lucide="calendar-x" class="w-6 h-6 text-slate-400"></i></div><p class="text-sm font-semibold text-slate-500 mt-2">Tidak ada jadwal hari ini</p></div>`;
     } else {
-        body = `<div class="space-y-2">${agenda.map(a => `
-            <div class="flex items-start gap-3 p-3 bg-slate-50 hover:bg-indigo-50/60 rounded-xl transition-colors">
-                <div class="bg-indigo-600 text-white rounded-xl px-2.5 py-2 text-center shrink-0 min-w-[52px]"><p class="text-[11px] font-black">${_esc(a.jamMulai)}</p><p class="text-[9px] opacity-50 my-0.5">—</p><p class="text-[11px] font-black opacity-80">${_esc(a.jamSelesai)}</p></div>
-                <div class="flex-1 min-w-0"><p class="font-bold text-slate-800 text-sm">${_esc(a.kelas)}</p><p class="text-xs text-indigo-600 font-semibold">${_esc(a.mapel)}</p></div>
-            </div>`).join('')}</div>`;
+        body = `<div class="space-y-2">${agenda.map((a, i) => {
+            const isNow = _isCurrentTime(a.jamMulai, a.jamSelesai);
+            return `
+            <div class="flex items-start gap-3 p-3.5 ${isNow ? 'bg-indigo-50 border border-indigo-200 ring-1 ring-indigo-100' : 'bg-slate-50 hover:bg-indigo-50/40'} rounded-xl transition-all">
+                <div class="bg-indigo-600 text-white rounded-xl px-3 py-2.5 text-center shrink-0 min-w-[56px] shadow-sm">
+                    <p class="text-xs font-black leading-none">${_esc(a.jamMulai || '?')}</p>
+                    <div class="w-3 h-px bg-white/40 mx-auto my-1"></div>
+                    <p class="text-[10px] font-bold leading-none opacity-70">${_esc(a.jamSelesai || '?')}</p>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <p class="font-bold text-slate-800 text-sm">${_esc(a.kelas || 'Tanpa Kelas')}</p>
+                        ${isNow ? '<span class="text-[9px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded-full animate-pulse">SEDANG BERLANGSUNG</span>' : ''}
+                    </div>
+                    <p class="text-xs text-indigo-600 font-semibold mt-0.5">${_esc(a.mapel)}</p>
+                    ${a.ruang ? `<p class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3"></i>${_esc(a.ruang)}</p>` : ''}
+                </div>
+                <span class="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-lg ${a.kategori === 'Intensif' ? 'bg-amber-100 text-amber-700' : a.kategori === 'Kegiatan' ? 'bg-slate-200 text-slate-600' : 'bg-indigo-100 text-indigo-700'}">${_esc(a.kategori || 'Normal')}</span>
+            </div>`;
+        }).join('')}</div>`;
     }
     return `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="p-4 border-b border-slate-100 flex items-center gap-3"><div class="bg-indigo-600 p-2 rounded-xl"><i data-lucide="calendar-days" class="w-4 h-4 text-white"></i></div><div><h3 class="font-bold text-slate-800 text-sm">Agenda Hari Ini</h3><p class="text-[11px] text-slate-400">${_esc(hariIni)} · ${agenda ? agenda.length : 0} jadwal</p></div></div>
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+            <div class="flex items-center gap-3"><div class="bg-indigo-600 p-2 rounded-xl"><i data-lucide="calendar-days" class="w-4 h-4 text-white"></i></div><div><h3 class="font-bold text-slate-800 text-sm">Agenda Hari Ini</h3><p class="text-[11px] text-slate-400">${_esc(hariIni)} · ${agenda ? agenda.length : 0} jadwal</p></div></div>
+            <button onclick="pindahHalaman('jadwalview')" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">Lihat Semua →</button>
+        </div>
         <div class="p-4">${body}</div></div>`;
+}
+
+function _isCurrentTime(mulai, selesai) {
+    if (!mulai || !selesai) return false;
+    try {
+        const now = new Date();
+        const h = now.getHours(), m = now.getMinutes();
+        const nowMin = h * 60 + m;
+        const [mH, mM] = mulai.split(':').map(Number);
+        const [sH, sM] = selesai.split(':').map(Number);
+        return nowMin >= (mH * 60 + mM) && nowMin <= (sH * 60 + sM);
+    } catch(e) { return false; }
 }
 
 function _buildTodo(todos) {
@@ -185,6 +219,74 @@ function _buildQuickLinks(links) {
     return `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="p-4 border-b border-slate-100 flex items-center justify-between"><div class="flex items-center gap-3"><div class="bg-slate-700 p-2 rounded-xl"><i data-lucide="link" class="w-4 h-4 text-white"></i></div><h3 class="font-bold text-slate-800 text-sm">Quick Links</h3></div><button onclick="pindahHalaman('quicklinks')" class="text-xs font-bold text-indigo-600">Kelola →</button></div>
         <div class="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">${linkArray.slice(0, 10).map(l => `<a href="${_esc(l.url)}" target="_blank" class="flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${colorMap[l.color] || colorMap.indigo}"><i data-lucide="${l.icon || 'link'}" class="w-4 h-4 shrink-0"></i><span class="flex-1 truncate text-xs">${_esc(l.label)}</span></a>`).join('')}</div></div>`;
+}
+
+// ── Siswa Perlu Perhatian ────────────────────────────────────
+function _buildPerhatian(list) {
+    let body;
+    if (!list || list.length === 0) {
+        body = `<div class="py-10 text-center space-y-2">
+            <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto"><i data-lucide="smile" class="w-6 h-6 text-emerald-600"></i></div>
+            <p class="text-sm font-semibold text-slate-600">Semua siswa dalam kondisi baik! 🎉</p>
+            <p class="text-xs text-slate-400">Tidak ada siswa yang memerlukan perhatian khusus</p>
+        </div>`;
+    } else {
+        body = `<div class="space-y-2">${list.map(s => {
+            const badges = (s.alasan || []).map(a => {
+                const cls = a.tipe === 'nilai' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700';
+                return `<span class="${cls} text-[10px] font-bold px-2 py-0.5 rounded-lg">${_esc(a.label)}</span>`;
+            }).join('');
+            const inisial = (s.nama || '').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+            return `
+            <div class="flex items-center gap-3 p-3 bg-slate-50 hover:bg-rose-50/30 rounded-xl transition-colors">
+                <div class="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center font-bold text-rose-700 text-sm shrink-0">${inisial}</div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-slate-800 leading-tight truncate">${_esc(s.nama)}</p>
+                    <p class="text-[11px] text-slate-400">${_esc(s.kelas || '')}</p>
+                    <div class="flex flex-wrap gap-1 mt-1">${badges}</div>
+                </div>
+            </div>`;
+        }).join('')}</div>`;
+    }
+    return `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex items-center gap-3"><div class="bg-rose-500 p-2 rounded-xl"><i data-lucide="alert-circle" class="w-4 h-4 text-white"></i></div><div><h3 class="font-bold text-slate-800 text-sm">Siswa Perlu Perhatian</h3><p class="text-[11px] text-slate-400">${list ? list.length : 0} siswa teridentifikasi</p></div></div>
+        <div class="p-4">${body}</div></div>`;
+}
+
+// ── Apresiasi Siswa ─────────────────────────────────────────
+function _buildApresiasi(apr) {
+    if (!apr) apr = {};
+    const mkCard = (icon, iconBg, label, siswa, valueStr) => {
+        if (!siswa) return `
+        <div class="flex-1 min-w-[130px] bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col gap-2">
+            <div class="${iconBg} w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"><i data-lucide="${icon}" class="w-4 h-4 text-white"></i></div>
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider leading-tight">${label}</p>
+            <p class="text-xs text-slate-400 font-medium">Belum ada data</p>
+        </div>`;
+        const inisial = (siswa.nama || '').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+        return `
+        <div class="flex-1 min-w-[130px] bg-gradient-to-br from-slate-50 to-slate-100/30 rounded-2xl p-4 border border-slate-200 flex flex-col gap-2">
+            <div class="${iconBg} w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"><i data-lucide="${icon}" class="w-4 h-4 text-white"></i></div>
+            <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider leading-tight">${label}</p>
+            <div class="flex items-center gap-2 mt-0.5">
+                <div class="w-7 h-7 rounded-lg ${iconBg} flex items-center justify-center text-[10px] font-black text-white">${inisial}</div>
+                <div class="min-w-0"><p class="font-bold text-slate-800 text-xs leading-tight truncate">${_esc(siswa.nama)}</p><p class="text-[10px] text-slate-500 truncate">${_esc(siswa.kelas || '')}</p></div>
+            </div>
+            <p class="text-base font-black text-indigo-600">${valueStr}</p>
+        </div>`;
+    };
+
+    const starVal = apr.academicStar ? 'Nilai ' + apr.academicStar.nilai : null;
+    const growthVal = apr.growthChampion ? '+' + apr.growthChampion.delta + ' poin' : null;
+    const activeVal = apr.activeLearner ? apr.activeLearner.poin + ' poin' : null;
+
+    return `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex items-center gap-3"><div class="bg-amber-500 p-2 rounded-xl"><i data-lucide="award" class="w-4 h-4 text-white"></i></div><div><h3 class="font-bold text-slate-800 text-sm">Apresiasi Siswa</h3><p class="text-[11px] text-slate-400">Penghargaan periode ini</p></div></div>
+        <div class="p-4 flex flex-wrap gap-3">
+            ${mkCard('star', 'bg-amber-500', '⭐ Academic Star', apr.academicStar, starVal)}
+            ${mkCard('trending-up', 'bg-emerald-500', '📈 Growth Champion', apr.growthChampion, growthVal)}
+            ${mkCard('zap', 'bg-indigo-600', '⚡ Active Learner', apr.activeLearner, activeVal)}
+        </div></div>`;
 }
 
 // ── Modal Todo ──────────────────────────────────────────────
