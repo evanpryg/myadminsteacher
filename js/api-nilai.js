@@ -355,7 +355,7 @@ async function getDashboardData() {
         return {
             jamMulai: jam_mulai, jamSelesai: jam_selesai,
             kelas: j.kelas || '', mapel: j.mata_pelajaran || '',
-            ruang: '', kategori: 'Normal'
+            ruang: j.ruangan || '', kategori: j.kategori || 'Normal'
         };
     });
 
@@ -453,8 +453,8 @@ async function getPengaturanData() {
     // Map jadwal to frontend format
     const jadwalMapped = (jadwal || []).map(j => {
         let jam_mulai = '', jam_selesai = '';
-        if (j.jam_ke) { const p = j.jam_ke.split('-'); jam_mulai = (p[0]||'').trim(); jam_selesai = (p[1]||'').trim(); }
-        return { id: j.id, hari: j.hari, jam_mulai, jam_selesai, kelas: j.kelas || '', mata_pelajaran: j.mata_pelajaran || '', ruang: '', kategori: 'Normal' };
+        if (j.jam_ke) { const p = j.jam_ke.split(/[-\s]+/); jam_mulai = (p[0]||'').trim(); jam_selesai = (p[1]||'').trim(); }
+        return { id: j.id, hari: j.hari, jam_mulai, jam_selesai, kelas: j.kelas || '', mata_pelajaran: j.mata_pelajaran || '', ruang: j.ruangan || '', kategori: j.kategori || 'Normal' };
     });
 
     return {
