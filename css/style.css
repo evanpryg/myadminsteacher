@@ -1,0 +1,451 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+    body {
+        font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+        background-color: #f8fafc;
+        color: #0f172a;
+    }
+
+    /* ============================================================
+       SPLASH / LOADING SCREEN
+       ============================================================ */
+    #splash-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #6366f1 100%);
+        transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+    #splash-screen.fade-out {
+        opacity: 0;
+        visibility: hidden;
+    }
+    .splash-logo {
+        width: 80px;
+        height: 80px;
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+        animation: splash-bounce 2s ease-in-out infinite;
+        border: 2px solid rgba(255,255,255,0.2);
+    }
+    .splash-logo svg {
+        width: 40px;
+        height: 40px;
+        color: white;
+    }
+    .splash-title {
+        font-size: 1.75rem;
+        font-weight: 900;
+        color: white;
+        letter-spacing: -0.5px;
+        margin-bottom: 0.25rem;
+    }
+    .splash-subtitle {
+        font-size: 0.8rem;
+        color: rgba(255,255,255,0.7);
+        font-weight: 500;
+        margin-bottom: 2rem;
+    }
+    .splash-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255,255,255,0.2);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: splash-spin 0.8s linear infinite;
+    }
+    .splash-dots {
+        display: flex;
+        gap: 6px;
+        margin-top: 1.5rem;
+    }
+    .splash-dots span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.4);
+        animation: splash-dot 1.4s ease-in-out infinite;
+    }
+    .splash-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .splash-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes splash-bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+    }
+    @keyframes splash-spin {
+        to { transform: rotate(360deg); }
+    }
+    @keyframes splash-dot {
+        0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+        40% { transform: scale(1); opacity: 1; background: white; }
+    }
+
+    /* ============================================================
+       FITUR TERKUNCI
+       ============================================================ */
+    .fitur-terkunci {
+        position: relative;
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+    .fitur-terkunci::after {
+        content: "Nanti";
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background-color: #cbd5e1;
+        color: #475569;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
+        text-transform: uppercase;
+    }
+
+    /* ============================================================
+       DARK MODE
+       ============================================================ */
+    .dark body { background-color: #0f172a; color: #e2e8f0; }
+    .dark .bg-white { background-color: #1e293b !important; }
+    .dark .bg-slate-50 { background-color: #162032 !important; }
+    .dark .bg-slate-100 { background-color: #334155 !important; }
+    .dark .border-slate-200 { border-color: #334155 !important; }
+    .dark .border-slate-100 { border-color: #1e293b !important; }
+    .dark .border-slate-300 { border-color: #475569 !important; }
+
+    .dark .text-slate-900 { color: #f8fafc !important; }
+    .dark .text-slate-800 { color: #f1f5f9 !important; }
+    .dark .text-slate-700 { color: #e2e8f0 !important; }
+    .dark .text-slate-600 { color: #cbd5e1 !important; }
+    .dark .text-slate-500 { color: #94a3b8 !important; }
+    .dark .text-slate-400 { color: #94a3b8 !important; }
+    .dark .text-slate-300 { color: #cbd5e1 !important; }
+    .dark p, .dark span, .dark label, .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark td, .dark th { 
+        color: inherit; 
+    }
+
+    .dark .text-indigo-700 { color: #a5b4fc !important; }
+    .dark .text-indigo-600 { color: #a5b4fc !important; }
+    .dark .text-sky-700 { color: #7dd3fc !important; }
+    .dark .text-sky-600 { color: #7dd3fc !important; }
+    .dark .text-sky-800 { color: #7dd3fc !important; }
+    .dark .text-emerald-700 { color: #6ee7b7 !important; }
+    .dark .text-emerald-600 { color: #6ee7b7 !important; }
+    .dark .text-emerald-800 { color: #6ee7b7 !important; }
+    .dark .text-amber-700 { color: #fcd34d !important; }
+    .dark .text-amber-600 { color: #fcd34d !important; }
+    .dark .text-amber-800 { color: #fcd34d !important; }
+    .dark .text-rose-700 { color: #fda4af !important; }
+    .dark .text-rose-600 { color: #fda4af !important; }
+    .dark .text-rose-500 { color: #fb7185 !important; }
+    .dark .text-violet-700 { color: #c4b5fd !important; }
+    .dark .text-violet-600 { color: #c4b5fd !important; }
+    .dark .text-teal-700 { color: #5eead4 !important; }
+
+    .dark .bg-indigo-50, .dark .bg-indigo-50\/30 { background-color: #1e1b4b !important; }
+    .dark .bg-sky-50, .dark .bg-sky-50\/30 { background-color: #0c2942 !important; }
+    .dark .bg-emerald-50, .dark .bg-emerald-50\/30 { background-color: #0c2e24 !important; }
+    .dark .bg-amber-50, .dark .bg-amber-50\/30 { background-color: #2e2409 !important; }
+    .dark .bg-rose-50, .dark .bg-rose-50\/30 { background-color: #2e0c14 !important; }
+    .dark .bg-violet-50 { background-color: #1e1145 !important; }
+    .dark .bg-teal-50 { background-color: #0c2e2e !important; }
+
+    .dark .border-indigo-200 { border-color: #3730a3 !important; }
+    .dark .border-sky-200 { border-color: #0369a1 !important; }
+    .dark .border-emerald-200 { border-color: #047857 !important; }
+    .dark .border-amber-200 { border-color: #92400e !important; }
+    .dark .border-rose-200 { border-color: #9f1239 !important; }
+    .dark .border-violet-200 { border-color: #5b21b6 !important; }
+
+    .dark .hover\:bg-slate-50:hover { background-color: #334155 !important; }
+    .dark .hover\:bg-slate-100:hover { background-color: #475569 !important; }
+    .dark .hover\:bg-slate-200:hover { background-color: #475569 !important; }
+
+    .dark input, .dark select, .dark textarea { 
+        background-color: #0f172a !important; 
+        border-color: #475569 !important; 
+        color: #f1f5f9 !important; 
+    }
+    .dark input::placeholder, .dark textarea::placeholder { color: #64748b !important; }
+    .dark input:focus, .dark select:focus, .dark textarea:focus {
+        border-color: #6366f1 !important;
+    }
+    .dark option { background-color: #1e293b; color: #f1f5f9; }
+
+    .dark table thead tr { background-color: #1e293b !important; }
+    .dark table tbody tr:hover { background-color: #334155 !important; }
+    .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
+
+    .dark [class*="shadow-2xl"] { background-color: #1e293b !important; }
+
+    .dark .bg-slate-200 { background-color: #475569 !important; }
+    .dark .text-slate-400.cursor-not-allowed { color: #64748b !important; }
+
+    .dark .bg-slate-900 { background-color: #0f172a !important; }
+    .dark .bg-slate-900 .text-white { color: #fff !important; }
+
+    /* ============================================================
+       MOBILE SIDEBAR
+       ============================================================ */
+    #sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 40;
+        backdrop-filter: blur(2px);
+    }
+    #sidebar-overlay.active { display: block; }
+
+    @media (max-width: 767px) {
+        aside#sidebar-main {
+            position: fixed;
+            left: -100%;
+            top: 0;
+            bottom: 0;
+            z-index: 50;
+            transition: left 0.3s ease;
+            display: flex !important;
+        }
+        aside#sidebar-main.open { left: 0; }
+    }
+
+    /* ============================================================
+       MOBILE RESPONSIVE FIXES
+       ============================================================ */
+    @media (max-width: 767px) {
+        /* Fix bottom cutoff: allow natural scrolling on mobile */
+        main {
+            height: auto !important;
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow: visible !important;
+        }
+
+        main > .flex-1 {
+            padding: 0.75rem !important;
+            overflow: visible !important;
+            height: auto !important;
+            padding-bottom: 2.5rem !important;
+        }
+
+        /* Header compact */
+        header {
+            height: 3rem !important;
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+        header h2#judul-halaman {
+            font-size: 0.9rem !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        /* ── ALL CARDS & PANELS: reduce padding and rounded ── */
+        .rounded-2xl { border-radius: 0.75rem !important; }
+        .p-4 { padding: 0.75rem !important; }
+        .p-5 { padding: 0.875rem !important; }
+        .p-6 { padding: 1rem !important; }
+        .p-7 { padding: 1.25rem !important; }
+        .gap-6 { gap: 1rem !important; }
+        .gap-5 { gap: 0.875rem !important; }
+        .gap-4 { gap: 0.75rem !important; }
+        .space-y-6 > * + * { margin-top: 1rem !important; }
+        .space-y-5 > * + * { margin-top: 0.875rem !important; }
+
+        /* ── TAB SWITCHERS: horizontal scroll on all pages ── */
+        #halaman-presensi > div:first-child .flex.items-center.gap-2,
+        #halaman-keaktifan > div:first-child .flex.items-center.gap-2,
+        #halaman-datamaster > .bg-white .flex.items-center,
+        #halaman-pengaturan .border-b .flex.items-center {
+            overflow-x: auto !important;
+            flex-wrap: nowrap !important;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        #halaman-presensi > div:first-child .flex.items-center.gap-2::-webkit-scrollbar,
+        #halaman-keaktifan > div:first-child .flex.items-center.gap-2::-webkit-scrollbar,
+        #halaman-datamaster > .bg-white .flex.items-center::-webkit-scrollbar,
+        #halaman-pengaturan .border-b .flex.items-center::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Tab buttons: compact size, no wrap */
+        #halaman-presensi button[id^="tab-btn-"],
+        #halaman-keaktifan button[id^="tab-btn-"],
+        #halaman-datamaster button[id^="dm-tab-"],
+        #halaman-pengaturan button[id^="pg-tab-"] {
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
+            font-size: 0.7rem !important;
+            padding: 0.45rem 0.7rem !important;
+        }
+
+        /* ── FILTER BARS: stack vertically ── */
+        #panel-presensi-input > .bg-white .flex.flex-wrap,
+        #panel-keaktifan-input > .bg-white .flex.flex-wrap,
+        #panel-keaktifan-rekap > .bg-white .flex.flex-wrap,
+        #halaman-nilai > .bg-white .flex.flex-wrap {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 0.5rem !important;
+        }
+
+        /* Select/input containers: full width */
+        #panel-presensi-input select,
+        #panel-presensi-input input[type="date"],
+        #panel-keaktifan-input select,
+        #panel-keaktifan-input input[type="date"],
+        #panel-keaktifan-rekap select,
+        #panel-keaktifan-rekap input[type="date"],
+        #halaman-nilai select {
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        /* ── NILAI PAGE: Bobot bar scroll ── */
+        #halaman-nilai > .bg-white > .flex.flex-wrap.items-center.gap-3 {
+            overflow-x: auto !important;
+            flex-wrap: nowrap !important;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+            padding: 0.5rem !important;
+        }
+        #halaman-nilai > .bg-white > .flex.flex-wrap.items-center.gap-3::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Bab buttons: smaller */
+        #container-btn-bab {
+            overflow-x: auto !important;
+            flex-wrap: nowrap !important;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+        }
+        #container-btn-bab::-webkit-scrollbar { display: none; }
+        #container-btn-bab button {
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
+            font-size: 0.65rem !important;
+            padding: 0.4rem 0.6rem !important;
+        }
+
+        /* ── PRESENSI: Make button group compact ── */
+        #body-tabel-presensi-input .inline-flex button {
+            padding: 0.4rem 0.6rem !important;
+            font-size: 0.65rem !important;
+        }
+
+        /* ── KEAKTIFAN: Cards grid compact ── */
+        #container-kartu-siswa {
+            grid-template-columns: 1fr !important;
+            gap: 0.5rem !important;
+        }
+
+        /* Keaktifan legenda: compact */
+        #panel-keaktifan-input > .flex.flex-wrap.gap-2 {
+            gap: 0.25rem !important;
+        }
+        #panel-keaktifan-input > .flex.flex-wrap.gap-2 > span {
+            font-size: 0.6rem !important;
+            padding: 0.2rem 0.4rem !important;
+        }
+
+        /* ── PENGATURAN: profil grid single column ── */
+        #pg-panel-profil .grid.grid-cols-1.lg\:grid-cols-2 {
+            grid-template-columns: 1fr !important;
+        }
+
+        /* Kelas mengajar grid: 1 col */
+        #daftar-kelas-mengajar {
+            grid-template-columns: 1fr !important;
+        }
+
+        /* ── TABLES: ensure horizontal scroll & compact text ── */
+        table {
+            font-size: 0.7rem !important;
+        }
+        table th, table td {
+            padding: 0.4rem 0.5rem !important;
+        }
+        .overflow-x-auto {
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* ── MODALS: full width, max height ── */
+        .fixed.inset-0 > div,
+        .absolute.inset-0 > div {
+            max-width: 95vw !important;
+            max-height: 92vh !important;
+            margin: 0 auto !important;
+            border-radius: 1rem !important;
+        }
+
+        /* Modal inner padding */
+        .fixed.inset-0 .p-6,
+        .absolute.inset-0 .p-6 {
+            padding: 1rem !important;
+        }
+
+        /* ── BUTTONS: slightly smaller ── */
+        button {
+            font-size: inherit;
+        }
+        .text-xs { font-size: 0.68rem !important; }
+
+        /* ── WEEK NAVIGATOR: stack on mobile ── */
+        #halaman-jadwalview > .bg-white:first-child {
+            flex-direction: column !important;
+            text-align: center;
+            gap: 0.5rem !important;
+        }
+        #halaman-jadwalview > .bg-white:first-child .flex.gap-2 {
+            justify-content: center !important;
+        }
+
+        /* Jadwal grid single column */
+        #jadwal-week-grid {
+            grid-template-columns: 1fr !important;
+            gap: 0.75rem !important;
+        }
+
+        /* ── EXPORT GRID: single column ── */
+        #pg-panel-export .grid {
+            grid-template-columns: 1fr !important;
+        }
+
+        /* ── SAVE BUTTONS: full width ── */
+        #btn-simpan-presensi,
+        #btn-simpan-keaktifan,
+        #btn-simpan-profil {
+            width: 100% !important;
+            justify-content: center !important;
+        }
+    }
+
+    /* Small phone (< 380px) */
+    @media (max-width: 380px) {
+        header h2#judul-halaman {
+            max-width: 130px;
+            font-size: 0.8rem !important;
+        }
+        .splash-title { font-size: 1.4rem; }
+        .splash-logo { width: 64px; height: 64px; }
+        .splash-logo svg { width: 32px; height: 32px; }
+
+        .p-4 { padding: 0.5rem !important; }
+        table th, table td { padding: 0.25rem 0.35rem !important; }
+        table { font-size: 0.6rem !important; }
+    }
