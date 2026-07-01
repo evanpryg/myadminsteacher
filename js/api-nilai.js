@@ -548,13 +548,37 @@ async function muatDmSiswa() {
             if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-slate-400 font-semibold">Belum ada kelas yang diampu.</td></tr>';
             return;
         }
-        // Fetch siswa from semua kelas yang diampu
         const filter = kelasAmpu.map(k => "kelas.eq." + encodeURIComponent(k)).join(",");
         const data = await fetchSupabase("/rest/v1/data_siswa?or=(" + filter + ")&order=kelas,nama_siswa", "GET") || [];
+        
         if (tbody) {
-            tbody.innerHTML = data.map((s, i) => `<tr class="hover:bg-slate-50"><td class="py-2 px-3 text-slate-400">${i + 1}</td><td class="py-2 px-3 font-mono text-slate-600">${s.nisn}</td><td class="py-2 px-3 font-semibold text-slate-800">${s.nama_siswa}</td><td class="py-2 px-3 text-slate-600">${s.kelas}</td></tr>`).join('') || '<tr><td colspan="4" class="py-8 text-center text-slate-400">Tidak ada siswa.</td></tr>';
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-slate-400">Tidak ada siswa.</td></tr>';
+            } else {
+                // Group by kelas
+                const grouped = {};
+                data.forEach(s => {
+                    if (!grouped[s.kelas]) grouped[s.kelas] = [];
+                    grouped[s.kelas].push(s);
+                });
+                
+                let html = '';
+                Object.keys(grouped).sort().forEach(kelas => {
+                    const siswaKelas = grouped[kelas];
+                    html += `<tr class="bg-indigo-50/50"><td colspan="4" class="py-2.5 px-3">
+                        <div class="flex items-center justify-between">
+                            <span class="font-black text-indigo-700 text-xs">${kelas}</span>
+                            <span class="text-[10px] font-bold text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full">${siswaKelas.length} siswa</span>
+                        </div>
+                    </td></tr>`;
+                    siswaKelas.forEach((s, i) => {
+                        html += `<tr class="hover:bg-slate-50"><td class="py-1.5 px-3 text-slate-400 text-xs text-center">${i + 1}</td><td class="py-1.5 px-3 font-mono text-slate-500 text-xs">${s.nisn}</td><td class="py-1.5 px-3 font-semibold text-slate-800 text-sm">${s.nama_siswa}</td><td class="py-1.5 px-3 text-slate-500 text-xs">${s.kelas}</td></tr>`;
+                    });
+                });
+                tbody.innerHTML = html;
+            }
         }
-        if (info) info.textContent = `Total: ${data.length} siswa dari ${kelasAmpu.length} kelas yang diampu`;
+        if (info) info.textContent = `Total: ${data.length} siswa dari ${Object.keys(grouped || {}).length || kelasAmpu.length} kelas`;
     } catch (err) {
         if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-rose-500 font-bold">Gagal: ${err.message}</td></tr>`;
     }
