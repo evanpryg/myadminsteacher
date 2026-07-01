@@ -24,6 +24,10 @@ async function initHalamanDashboard(forceRefresh) {
     if (content) content.classList.add('hidden');
 
     try {
+        // Clear settings cache to get fresh data
+        if (typeof _settingsCache !== 'undefined') {
+            Object.keys(_settingsCache).forEach(k => delete _settingsCache[k]);
+        }
         const data = await getDashboardData();
         _dbData = data;
         _dbCacheTime = Date.now();
@@ -38,7 +42,7 @@ async function initHalamanDashboard(forceRefresh) {
     }
 }
 
-function refreshDashboardManual() { initHalamanDashboard(true); }
+function refreshDashboardManual() { _dbData = null; initHalamanDashboard(true); }
 
 // =========================================================
 // BUILDER UTAMA
