@@ -1301,3 +1301,198 @@ function _fmtTglShort(d) {
 function _esc(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+
+// =========================================================
+// QUICK LINKS PAGE (halaman-quicklinks)
+// =========================================================
+let _qlData = { categories: ['Umum'], links: [] };
+
+async function initHalamanQuickLinks() {
+    const container = document.getElementById('ql-container');
+    if (!container) return;
+    container.innerHTML = '<div class="py-10 text-center text-indigo-500 animate-pulse font-semibold">Memuat quick links...</div>';
+    try {
+        const data = await getQuickLinksData();
+        _qlData = data || { categories: ['Umum'], links: [] };
+        if (!_qlData.categories || _qlData.categories.length === 0) _qlData.categories = ['Umum'];
+        if (!_qlData.links) _qlData.links = [];
+        _renderQuickLinksFullPage();
+    } catch (err) {
+        container.innerHTML = `<div class="py-10 text-center text-rose-500 font-bold">Gagal memuat: ${err.message}</div>`;
+    }
+}
+
+function _renderQuickLinksFullPage() {
+    const container = document.getElementById('ql-container');
+    if (!container) return;
+
+    if (_qlData.links.length === 0) {
+        container.innerHTML = '<div class="py-10 text-center text-slate-400 font-semibold">Belum ada link. Klik "+ Tambah Link" untuk menambahkan.</div>';
+        lucide.createIcons();
+        return;
+    }
+
+    const colorMap = { emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700', amber: 'bg-amber-50 border-amber-200 text-amber-700', sky: 'bg-sky-50 border-sky-200 text-sky-700', indigo: 'bg-indigo-50 border-indigo-200 text-indigo-700', violet: 'bg-violet-50 border-violet-200 text-violet-700', rose: 'bg-rose-50 border-rose-200 text-rose-700' };
+
+    // Group by category
+    let html = '';
+    _qlData.categories.forEach(cat => {
+        const linksInCat = _qlData.links.filter(l => (l.kategori || 'Umum') === cat);
+        if (linksInCat.length === 0 && _qlData.categories.length > 1) return; // skip empty categories unless it's the only one
+
+        html += `<div class="space-y-3">
+            <div class="flex items-center justify-between">
+                <h4 class="font-bold text-slate-700 text-sm">${_esc(cat)}</h4>
+                ${_qlData.categories.length > 1 ? `<button onclick="_hapusKategori('${_esc(cat)}')" class="text-[10px] text-slate-400 hover:text-rose-500 font-bold">Hapus Kategori</button>` : ''}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                ${linksInCat.map((l, i) => {
+                    const idx = _qlData.links.indexOf(l);
+                    const cls = colorMap[l.color] || colorMap.indigo;
+                    return `<div class="group relative flex items-center gap-3 p-4 rounded-2xl border ${cls} hover:shadow-md transition-all">
+                        <i data-lucide="${_esc(l.icon || 'link')}" class="w-5 h-5 shrink-0"></i>
+                        <div class="flex-1 min-w-0">
+                            <a href="${_esc(l.url)}" target="_blank" class="font-bold text-sm block truncate hover:underline">${_esc(l.label)}</a>
+                            <p class="text-[10px] opacity-60 truncate">${_esc(l.url)}</p>
+                        </div>
+                        <div class="absolute top-2 right-2 hidden group-hover:flex items-center gap-1">
+                            <button onclick="_editQL(${idx})" class="bg-white/80 p-1.5 rounded-lg hover:bg-white shadow-sm"><i data-lucide="edit-3" class="w-3 h-3 text-slate-600"></i></button>
+                            <button onclick="_hapusQL(${idx})" class="bg-white/80 p-1.5 rounded-lg hover:bg-rose-50 shadow-sm"><i data-lucide="trash-2" class="w-3 h-3 text-rose-500"></i></button>
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+    lucide.createIcons();
+}
+
+// ── Modal: Tambah Kategori ──
+function bukaModalTambahKategori() {
+    document.getElementById('ql-kategori-nama').value = '';
+    document.getElementById('modal-ql-kategori').classList.remove('hidden');
+    setTimeout(() => document.getElementById('ql-kategori-nama')?.focus(), 100);
+}
+
+async function simpanKategoriBaru() {
+    const nama = document.getElementById('ql-kategori-nama')?.value?.trim();
+    if (!nama) { alert('Nama kategori wajib diisi.'); return; }
+    if (_qlData.categories.includes(nama)) { alert('Kategori sudah ada.'); return; }
+
+    _qlData.categories.push(nama);
+    await simpanQuickLinks(_qlData);
+    document.getElementById('modal-ql-kategori').classList.add('hidden');
+    _renderQuickLinksFullPage();
+}
+
+async function _hapusKategori(cat) {
+    const linksInCat = _qlData.links.filter(l => (l.kategori || 'Umum') === cat);
+    if (linksInCat.length > 0) {
+        if (!confirm(`Kategori "${cat}" punya ${linksInCat.length} link. Hapus kategori beserta semua link-nya?`)) return;
+        _qlData.links = _qlData.links.filter(l => (l.kategori || 'Umum') !== cat);
+    }
+    _qlData.categories = _qlData.categories.filter(c => c !== cat);
+    if (_qlData.categories.length === 0) _qlData.categories = ['Umum'];
+    await simpanQuickLinks(_qlData);
+    _renderQuickLinksFullPage();
+}
+
+// ── Modal: Tambah/Edit Link ──
+let _qlEditIdx = null;
+
+function bukaModalTambahLink() {
+    _qlEditIdx = null;
+    document.getElementById('modal-ql-link-title').textContent = 'Tambah Link';
+    document.getElementById('ql-link-label').value = '';
+    document.getElementById('ql-link-url').value = '';
+    _populateQLKategoriDropdown('');
+    _populateQLIconGrid('link');
+    _populateQLColorGrid('indigo');
+    document.getElementById('ql-link-edit-idx').value = '';
+    document.getElementById('modal-ql-link').classList.remove('hidden');
+    setTimeout(() => document.getElementById('ql-link-label')?.focus(), 100);
+}
+
+function _editQL(idx) {
+    _qlEditIdx = idx;
+    const l = _qlData.links[idx];
+    if (!l) return;
+    document.getElementById('modal-ql-link-title').textContent = 'Edit Link';
+    document.getElementById('ql-link-label').value = l.label || '';
+    document.getElementById('ql-link-url').value = l.url || '';
+    document.getElementById('ql-link-edit-idx').value = idx;
+    _populateQLKategoriDropdown(l.kategori || 'Umum');
+    _populateQLIconGrid(l.icon || 'link');
+    _populateQLColorGrid(l.color || 'indigo');
+    document.getElementById('modal-ql-link').classList.remove('hidden');
+}
+
+function _populateQLKategoriDropdown(selected) {
+    const sel = document.getElementById('ql-link-kategori');
+    if (!sel) return;
+    sel.innerHTML = _qlData.categories.map(c => `<option value="${_esc(c)}" ${c === selected ? 'selected' : ''}>${_esc(c)}</option>`).join('');
+}
+
+function _populateQLIconGrid(selected) {
+    const icons = ['link','external-link','globe','book-open','file-text','video','hard-drive','graduation-cap','table-2','mail','phone','calendar','map-pin','music','image','code','terminal','database','star','heart','bookmark','clipboard','folder','search','settings'];
+    const grid = document.getElementById('ql-icon-grid');
+    if (!grid) return;
+    grid.innerHTML = icons.map(ic => `<button type="button" onclick="_selectQLIcon('${ic}')" class="w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${ic === selected ? 'bg-indigo-100 border-indigo-400 text-indigo-700' : 'border-slate-200 text-slate-500 hover:bg-slate-100'}"><i data-lucide="${ic}" class="w-4 h-4"></i></button>`).join('');
+    document.getElementById('ql-link-icon').value = selected;
+    lucide.createIcons();
+}
+
+function _selectQLIcon(icon) {
+    document.getElementById('ql-link-icon').value = icon;
+    _populateQLIconGrid(icon);
+}
+
+function _populateQLColorGrid(selected) {
+    const colors = ['indigo','emerald','amber','sky','violet','rose'];
+    const grid = document.getElementById('ql-color-grid');
+    if (!grid) return;
+    const colorBg = { indigo: 'bg-indigo-500', emerald: 'bg-emerald-500', amber: 'bg-amber-500', sky: 'bg-sky-500', violet: 'bg-violet-500', rose: 'bg-rose-500' };
+    grid.innerHTML = colors.map(c => `<button type="button" onclick="_selectQLColor('${c}')" class="w-7 h-7 rounded-full ${colorBg[c]} transition-all ${c === selected ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'opacity-60 hover:opacity-100'}"></button>`).join('');
+    document.getElementById('ql-link-color').value = selected;
+}
+
+function _selectQLColor(color) {
+    document.getElementById('ql-link-color').value = color;
+    _populateQLColorGrid(color);
+}
+
+async function simpanLinkQL() {
+    const label = document.getElementById('ql-link-label')?.value?.trim();
+    const url = document.getElementById('ql-link-url')?.value?.trim();
+    const kategori = document.getElementById('ql-link-kategori')?.value || 'Umum';
+    const icon = document.getElementById('ql-link-icon')?.value || 'link';
+    const color = document.getElementById('ql-link-color')?.value || 'indigo';
+
+    if (!label || !url) { alert('Label dan URL wajib diisi.'); return; }
+
+    const link = { label, url, kategori, icon, color };
+
+    if (_qlEditIdx !== null) {
+        _qlData.links[_qlEditIdx] = link;
+    } else {
+        _qlData.links.push(link);
+    }
+
+    try {
+        await simpanQuickLinks(_qlData);
+        document.getElementById('modal-ql-link').classList.add('hidden');
+        _renderQuickLinksFullPage();
+    } catch (err) {
+        alert('Gagal menyimpan: ' + (err.message || err));
+    }
+}
+
+async function _hapusQL(idx) {
+    if (!confirm('Hapus link ini?')) return;
+    _qlData.links.splice(idx, 1);
+    await simpanQuickLinks(_qlData);
+    _renderQuickLinksFullPage();
+}
