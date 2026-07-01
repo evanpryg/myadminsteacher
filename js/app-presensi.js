@@ -118,12 +118,12 @@ function renderTabelInputHarian() {
         html += `<tr class="hover:bg-slate-50/80 border-b border-slate-100">
             <td class="py-2 px-2 text-center text-slate-400 text-xs w-8">${i + 1}</td>
             <td class="py-2 px-2 font-bold text-slate-700 text-xs">${siswa.nama}</td>
-            <td class="py-2 px-2 text-center w-24">
-                <select onchange="pilihStatusHarian(${i}, this.value)" class="w-full rounded-md border-2 px-1.5 py-1 text-[11px] font-bold cursor-pointer focus:outline-none transition-all ${dropdownColor}" id="sel-presensi-${i}">
-                    <option value="H" ${status === 'H' ? 'selected' : ''}>H</option>
-                    <option value="I" ${status === 'I' ? 'selected' : ''}>I</option>
-                    <option value="S" ${status === 'S' ? 'selected' : ''}>S</option>
-                    <option value="A" ${status === 'A' ? 'selected' : ''}>A</option>
+            <td class="py-2 px-2 w-20">
+                <select onchange="pilihStatusHarian(${i}, this.value)" class="w-full rounded-md border-2 px-1 py-1 text-[10px] font-bold cursor-pointer focus:outline-none transition-all appearance-none text-center ${dropdownColor}" id="sel-presensi-${i}">
+                    <option value="H" ${status === 'H' ? 'selected' : ''}>Hadir</option>
+                    <option value="I" ${status === 'I' ? 'selected' : ''}>Izin</option>
+                    <option value="S" ${status === 'S' ? 'selected' : ''}>Sakit</option>
+                    <option value="A" ${status === 'A' ? 'selected' : ''}>Alfa</option>
                 </select>
             </td>
         </tr>`;
@@ -146,7 +146,7 @@ function pilihStatusHarian(idx, kode) {
     const sel = document.getElementById('sel-presensi-' + idx);
     if (sel) {
         const colorMap = { H: 'bg-emerald-100 border-emerald-400 text-emerald-800', I: 'bg-sky-100 border-sky-400 text-sky-800', S: 'bg-amber-100 border-amber-400 text-amber-800', A: 'bg-rose-100 border-rose-400 text-rose-800' };
-        sel.className = 'w-full rounded-md border-2 px-1.5 py-1 text-[11px] font-bold cursor-pointer focus:outline-none transition-all ' + (colorMap[kode] || 'bg-slate-50 border-slate-200 text-slate-600');
+        sel.className = 'w-full rounded-md border-2 px-1 py-1 text-[10px] font-bold cursor-pointer focus:outline-none transition-all appearance-none text-center ' + (colorMap[kode] || 'bg-slate-50 border-slate-200 text-slate-600');
     }
     updateStatusSimpanPresensi();
 }
