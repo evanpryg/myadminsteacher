@@ -47,6 +47,14 @@
                         class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left">
                     <i data-lucide="activity" class="w-5 h-5 text-indigo-600"></i> Keaktifan Siswa
                 </button>
+                <button onclick="pindahHalaman('catatansiswa')" id="btn-nav-catatansiswa"
+                        class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left">
+                    <i data-lucide="notebook-pen" class="w-5 h-5 text-indigo-600"></i> Catatan Siswa
+                </button>
+                <button onclick="pindahHalaman('jurnalmengajar')" id="btn-nav-jurnalmengajar"
+                        class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left">
+                    <i data-lucide="book-open-text" class="w-5 h-5 text-indigo-600"></i> Jurnal Mengajar
+                </button>
                 <button onclick="pindahHalaman('jadwalview')" id="btn-nav-jadwalview"
                         class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left">
                     <i data-lucide="calendar-days" class="w-5 h-5 text-indigo-600"></i> Jadwal Mengajar
@@ -575,6 +583,116 @@
                             <button onclick="document.getElementById('modal-dm-wali').classList.add('hidden')" class="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Batal</button>
                             <button onclick="simpanWali()" class="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm">Simpan</button>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================
+                 HALAMAN CATATAN SISWA
+                 ============================================================ -->
+            <div id="halaman-catatansiswa" class="hidden space-y-5">
+                <!-- Header + Filter -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Kelas</label>
+                            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                                <i data-lucide="users" class="w-4 h-4 text-indigo-500 shrink-0"></i>
+                                <select id="select-kelas-catatan"
+                                        class="bg-transparent font-bold text-slate-800 focus:outline-none text-sm cursor-pointer">
+                                    <option value="">— Pilih Kelas —</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span id="notif-catatan" class="hidden text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl transition-all"></span>
+                        <button id="btn-simpan-catatan" disabled
+                                onclick="simpanCatatanSiswa()"
+                                class="inline-flex items-center gap-2 bg-slate-200 text-slate-400 font-bold px-4 py-2 rounded-xl text-xs cursor-not-allowed">
+                            <i data-lucide="save" class="w-3.5 h-3.5"></i>Simpan Catatan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Info banner -->
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 flex items-start gap-3">
+                    <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+                    <p class="text-xs text-amber-800 font-medium">Catatan siswa digunakan untuk mencatat hal-hal penting terkait siswa seperti perilaku, perkembangan belajar, atau catatan khusus lainnya. Catatan akan tersimpan per kelas.</p>
+                </div>
+
+                <!-- Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                    <th class="py-3 px-4 w-12 text-center">No</th>
+                                    <th class="py-3 px-4 min-w-[180px]">Nama Siswa</th>
+                                    <th class="py-3 px-4 min-w-[300px]">Catatan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-tabel-catatan-siswa" class="text-xs divide-y divide-slate-100">
+                                <tr><td colspan="3" class="py-10 text-center text-slate-400 font-semibold">Pilih kelas untuk menampilkan data siswa.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================
+                 HALAMAN JURNAL MENGAJAR
+                 ============================================================ -->
+            <div id="halaman-jurnalmengajar" class="hidden space-y-5">
+                <!-- Header + Filter -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Kelas</label>
+                            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                                <i data-lucide="users" class="w-4 h-4 text-indigo-500 shrink-0"></i>
+                                <select id="select-kelas-jurnal"
+                                        class="bg-transparent font-bold text-slate-800 focus:outline-none text-sm cursor-pointer">
+                                    <option value="">— Pilih Kelas —</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span id="notif-jurnal" class="hidden text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl transition-all"></span>
+                        <button onclick="tambahBarisJurnal()" class="inline-flex items-center gap-2 bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-bold px-3 py-2 rounded-xl text-xs transition-all">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>Tambah Baris
+                        </button>
+                        <button id="btn-simpan-jurnal" disabled
+                                onclick="simpanJurnalMengajar()"
+                                class="inline-flex items-center gap-2 bg-slate-200 text-slate-400 font-bold px-4 py-2 rounded-xl text-xs cursor-not-allowed">
+                            <i data-lucide="save" class="w-3.5 h-3.5"></i>Simpan Jurnal
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Info banner -->
+                <div class="bg-sky-50 border border-sky-200 rounded-2xl px-5 py-3 flex items-start gap-3">
+                    <i data-lucide="info" class="w-4 h-4 text-sky-600 shrink-0 mt-0.5"></i>
+                    <p class="text-xs text-sky-800 font-medium">Jurnal mengajar mencatat progres setiap pertemuan per kelas. Gunakan untuk melacak materi yang sudah diajarkan dan sebagai dokumentasi kegiatan belajar mengajar.</p>
+                </div>
+
+                <!-- Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                    <th class="py-3 px-4 w-12 text-center">No</th>
+                                    <th class="py-3 px-4 w-32 text-center">Pertemuan Ke</th>
+                                    <th class="py-3 px-4 w-44">Tanggal Pertemuan</th>
+                                    <th class="py-3 px-4 min-w-[300px]">Catatan / Materi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-tabel-jurnal" class="text-xs divide-y divide-slate-100">
+                                <tr><td colspan="4" class="py-10 text-center text-slate-400 font-semibold">Pilih kelas untuk menampilkan jurnal mengajar.</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -1566,6 +1684,7 @@
     <script src="js/app-keaktifan.js"></script>
     <script src="js/app-dashboard.js"></script>
     <script src="js/app-pengaturan.js"></script>
+    <script src="js/app-catatan-jurnal.js"></script>
     <!-- Lesson Plan AI: Disabled temporarily -->
 <!-- MODAL: JADWAL MINGGU DEPAN -->
 <div id="modal-jadwal-minggu-depan" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center">

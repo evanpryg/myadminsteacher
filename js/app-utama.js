@@ -43,27 +43,31 @@ document.addEventListener("DOMContentLoaded", function() {
 
 function pindahHalaman(target) {
     const daftarHalaman = {
-        'dashboard':   document.getElementById('halaman-dashboard'),
-        'nilai':       document.getElementById('halaman-nilai'),
-        'presensi':    document.getElementById('halaman-presensi'),
-        'keaktifan':   document.getElementById('halaman-keaktifan'),
-        'jadwalview':  document.getElementById('halaman-jadwalview'),
-        'datamaster':  document.getElementById('halaman-datamaster'),
-        'lessonplan':  document.getElementById('halaman-lessonplan'),
-        'quicklinks':  document.getElementById('halaman-quicklinks'),
-        'pengaturan':  document.getElementById('halaman-pengaturan')
+        'dashboard':      document.getElementById('halaman-dashboard'),
+        'nilai':          document.getElementById('halaman-nilai'),
+        'presensi':       document.getElementById('halaman-presensi'),
+        'keaktifan':      document.getElementById('halaman-keaktifan'),
+        'catatansiswa':   document.getElementById('halaman-catatansiswa'),
+        'jurnalmengajar': document.getElementById('halaman-jurnalmengajar'),
+        'jadwalview':     document.getElementById('halaman-jadwalview'),
+        'datamaster':     document.getElementById('halaman-datamaster'),
+        'lessonplan':     document.getElementById('halaman-lessonplan'),
+        'quicklinks':     document.getElementById('halaman-quicklinks'),
+        'pengaturan':     document.getElementById('halaman-pengaturan')
     };
 
     const daftarTombol = {
-        'dashboard':   document.getElementById('btn-nav-dashboard'),
-        'nilai':       document.getElementById('btn-nav-nilai'),
-        'presensi':    document.getElementById('btn-nav-presensi'),
-        'keaktifan':   document.getElementById('btn-nav-keaktifan'),
-        'jadwalview':  document.getElementById('btn-nav-jadwalview'),
-        'datamaster':  document.getElementById('btn-nav-datamaster'),
-        'lessonplan':  document.getElementById('btn-nav-lessonplan'),
-        'quicklinks':  document.getElementById('btn-nav-quicklinks'),
-        'pengaturan':  document.getElementById('btn-nav-pengaturan')
+        'dashboard':      document.getElementById('btn-nav-dashboard'),
+        'nilai':          document.getElementById('btn-nav-nilai'),
+        'presensi':       document.getElementById('btn-nav-presensi'),
+        'keaktifan':      document.getElementById('btn-nav-keaktifan'),
+        'catatansiswa':   document.getElementById('btn-nav-catatansiswa'),
+        'jurnalmengajar': document.getElementById('btn-nav-jurnalmengajar'),
+        'jadwalview':     document.getElementById('btn-nav-jadwalview'),
+        'datamaster':     document.getElementById('btn-nav-datamaster'),
+        'lessonplan':     document.getElementById('btn-nav-lessonplan'),
+        'quicklinks':     document.getElementById('btn-nav-quicklinks'),
+        'pengaturan':     document.getElementById('btn-nav-pengaturan')
     };
 
     const judul = document.getElementById('judul-halaman');
@@ -87,15 +91,17 @@ function pindahHalaman(target) {
     }
 
     const judulMap = {
-        'dashboard':  'Dashboard Overview',
-        'nilai':      'Lembar Pengolahan Nilai',
-        'presensi':   'Presensi Siswa',
-        'keaktifan':  'Keaktifan Siswa',
-        'jadwalview': 'Jadwal Mengajar',
-        'datamaster': 'Data',
-        'lessonplan': 'Lesson Plan Generator',
-        'quicklinks': 'Quick Links',
-        'pengaturan': 'Kelola Data & Semester'
+        'dashboard':      'Dashboard Overview',
+        'nilai':          'Lembar Pengolahan Nilai',
+        'presensi':       'Presensi Siswa',
+        'keaktifan':      'Keaktifan Siswa',
+        'catatansiswa':   'Catatan Siswa',
+        'jurnalmengajar': 'Jurnal Mengajar',
+        'jadwalview':     'Jadwal Mengajar',
+        'datamaster':     'Data',
+        'lessonplan':     'Lesson Plan Generator',
+        'quicklinks':     'Quick Links',
+        'pengaturan':     'Kelola Data & Semester'
     };
     if (judul) judul.innerText = judulMap[target] || 'TeachMate';
 
@@ -114,6 +120,8 @@ function pindahHalaman(target) {
         if (el) el.innerHTML = '<div class="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center"><p class="text-amber-800 font-bold text-lg mb-2">🚧 Fitur Lesson Plan AI</p><p class="text-amber-700 text-sm">Fitur ini sedang dalam pengembangan untuk versi web. Akan diaktifkan kembali segera.</p></div>';
     }
     if (target === 'quicklinks' && typeof initHalamanQuickLinks === 'function') initHalamanQuickLinks();
+    if (target === 'catatansiswa' && typeof initHalamanCatatanSiswa === 'function') initHalamanCatatanSiswa();
+    if (target === 'jurnalmengajar' && typeof initHalamanJurnalMengajar === 'function') initHalamanJurnalMengajar();
 
     lucide.createIcons();
 }
