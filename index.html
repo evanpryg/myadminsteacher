@@ -1138,27 +1138,27 @@
                                 </div>
                                 
                                 <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">URL Template Google Docs</label>
-                                    <input type="text" id="pg-template-doc" placeholder="https://docs.google.com/document/d/..." class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                    <p class="text-[10px] text-slate-400 mt-1">Kosongkan jika ingin menggunakan PDF bawaan tanpa template.</p>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Model AI Gemini (Opsional)</label>
+                                    <input type="text" id="pg-lp-ai-model" placeholder="gemini-2.5-flash (default)" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                    <p class="text-[10px] text-slate-400 mt-1">Kosongkan untuk memakai default. Isi mis. <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px]">gemini-2.5-flash-lite</code> jika ingin model lain.</p>
                                 </div>
-                                
+
                                 <div>
                                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Nama Kepala Sekolah</label>
                                     <input type="text" id="pg-prompt-kepala" placeholder="Nama Kepala Sekolah untuk Tanda Tangan" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                 </div>
-                                
+
                                 <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Template Prompt AI</label>
-                                    <textarea id="pg-prompt-template" rows="12" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" placeholder="Buatkan rencana pembelajaran..."></textarea>
-                                    <p class="text-[10px] text-slate-400 mt-1">Placeholder yang tersedia: <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{mataPelajaran}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{kelas}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{tanggal}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{durasi}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{bahasa}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{materi}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{topik}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{modelPembelajaran}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{karakteristikKelas}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{catatanGuru}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{rataRataNilai}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{rataRataKehadiran}}</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px] text-slate-600">{{keaktifanSiswa}}</code>.</p>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Instruksi Tambahan untuk AI (Opsional)</label>
+                                    <textarea id="pg-lp-extra" rows="5" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400" placeholder="Contoh: Selalu sertakan kegiatan diferensiasi untuk siswa berkebutuhan khusus. Gunakan pendekatan deep learning (mindful, meaningful, joyful)..."></textarea>
+                                    <p class="text-[10px] text-slate-400 mt-1">Instruksi ini ditambahkan ke prompt AI setiap kali generate. Struktur output & template DOCX tidak terpengaruh — dikelola lewat database (tabel <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px]">lp_templates</code> &amp; <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px]">lp_learning_models</code>).</p>
                                 </div>
                             </div>
-                            
+
                             <div class="flex justify-between items-center pt-2 border-t border-slate-100">
                                 <button onclick="resetPromptToDefault()"
                                         class="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs transition-all border border-slate-200">
-                                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>Reset Prompt Default
+                                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>Reset Instruksi
                                 </button>
                                 <button id="btn-simpan-prompt" onclick="simpanPromptSettings()"
                                         class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition-all shadow-sm">
@@ -1244,77 +1244,8 @@
 
                     <!-- STEP 1: INFORMASI DASAR -->
                     <div id="lp-step-1" class="p-6 space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Mata Pelajaran</label>
-                                <input type="text" id="lp-form-mapel" placeholder="Fisika" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Kelas</label>
-                                <input type="text" id="lp-form-kelas" placeholder="X-A" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                            </div>
-                            <div class="grid grid-cols-3 gap-2">
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Tanggal</label>
-                                    <input type="date" id="lp-form-tanggal" class="w-full border border-slate-200 rounded-xl px-2 py-2.5 text-[11px] font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Durasi</label>
-                                    <input type="number" id="lp-form-durasi" value="90" min="1" class="w-full border border-slate-200 rounded-xl px-2 py-2.5 text-[11px] font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">TM Ke-</label>
-                                    <input type="number" id="lp-form-tm" value="1" min="1" class="w-full border border-slate-200 rounded-xl px-2 py-2.5 text-[11px] font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Bahasa Lesson Plan</label>
-                                <select id="lp-form-bahasa" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
-                                    <option value="Bahasa Indonesia">Bahasa Indonesia</option>
-                                    <option value="English">English</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Model Pembelajaran</label>
-                                <select id="lp-form-model" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
-                                    <option>Problem Based Learning (PBL)</option>
-                                    <option>Discovery Learning</option>
-                                    <option>Inquiry Learning</option>
-                                    <option>Project Based Learning (PjBL)</option>
-                                    <option>Contextual Teaching and Learning (CTL)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Materi Pembelajaran</label>
-                                <input type="text" id="lp-form-materi" placeholder="Listrik Statis" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Topik Pembelajaran</label>
-                                <input type="text" id="lp-form-topik" placeholder="Hukum Coulomb" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div class="md:col-span-1">
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Karakteristik Kelas</label>
-                                <select id="lp-form-karakteristik" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
-                                    <option value="Campuran">Campuran</option>
-                                    <option value="Tinggi">Tinggi (Cepat Paham)</option>
-                                    <option value="Sedang">Sedang (Standar)</option>
-                                    <option value="Rendah">Rendah (Butuh Bimbingan Lebih)</option>
-                                </select>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Catatan Khusus Guru (Opsional)</label>
-                                <input type="text" id="lp-form-catatan" placeholder="Sebagian siswa masih kesulitan memahami Hukum Coulomb, butuh visualisasi..." class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                            </div>
-                        </div>
+                        <!-- Form dinamis: dirender dari Field Registry (js/lp-registry.js) -->
+                        <div id="lp-form-fields" class="space-y-4"></div>
 
                         <div class="flex justify-end pt-4 border-t border-slate-100">
                             <button onclick="generateLessonPlanAIStart()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm flex items-center gap-2 transition-all shadow-sm">
@@ -1363,10 +1294,14 @@
                                     Simpan sebagai Final (Siap Ekspor)
                                 </label>
                             </div>
-                            <div class="flex gap-2">
+                            <div class="flex gap-2 flex-wrap">
+                                <button onclick="lpKembaliKeForm()" class="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition-colors border flex items-center gap-1.5"><i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>Ubah Form</button>
                                 <button onclick="kembaliKeListLessonPlan()" class="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition-colors border">Batal</button>
                                 <button onclick="simpanLessonPlanSekarang()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm">
-                                    <i data-lucide="save" class="w-4 h-4"></i>Simpan Lesson Plan
+                                    <i data-lucide="save" class="w-4 h-4"></i>Simpan
+                                </button>
+                                <button onclick="simpanLessonPlanSekarang(true)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                                    <i data-lucide="file-down" class="w-4 h-4"></i>Simpan &amp; Download Word
                                 </button>
                             </div>
                         </div>
@@ -1678,12 +1613,21 @@
     </div>
 
     </main>
+    <!-- DOCX generation (client-side): pizzip + docxtemplater -->
+    <script src="https://unpkg.com/pizzip@3.1.7/dist/pizzip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.50.0/docxtemplater.js"></script>
     <script src="js/supabase-client.js"></script><script src="js/api.js"></script><script src="js/api-nilai.js"></script><script src="js/app-utama.js"></script>
     <script src="js/app-nilai.js"></script>
     <script src="js/app-presensi.js"></script>
     <script src="js/app-keaktifan.js"></script>
     <script src="js/app-dashboard.js"></script>
     <script src="js/app-pengaturan.js"></script>
+    <!-- Lesson Plan Generator (registry-driven, template DOCX dari DB) -->
+    <script src="js/lp-registry.js"></script>
+    <script src="js/lp-api.js"></script>
+    <script src="js/lp-ai.js"></script>
+    <script src="js/lp-docx.js"></script>
+    <script src="js/app-lessonplan.js"></script>
     <script src="js/app-catatan-jurnal.js"></script>
     <!-- Lesson Plan AI: Disabled temporarily -->
 <!-- MODAL: JADWAL MINGGU DEPAN -->

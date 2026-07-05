@@ -11,7 +11,8 @@
 
 ## Persiapan Supabase (Hanya Sekali)
 
-Jalankan `supabase-migration.sql` di Supabase SQL Editor.
+1. Jalankan `supabase-migration.sql` di Supabase SQL Editor.
+2. Jalankan `supabase-migration-lessonplan.sql` (fitur Lesson Plan Generator).
 
 ## Struktur File
 
@@ -19,9 +20,13 @@ Jalankan `supabase-migration.sql` di Supabase SQL Editor.
 / (root repo)
 ├── index.html
 ├── supabase-migration.sql
+├── supabase-migration-lessonplan.sql
 ├── README.md
 ├── css/
 │   └── style.css
+├── templates/
+│   ├── lesson-plan-sma-v1.docx      # template DOCX (placeholder + loop docxtemplater)
+│   └── CONTOH-HASIL-RENDER.docx     # contoh hasil jadi
 └── js/
     ├── supabase-client.js
     ├── api.js
@@ -31,10 +36,33 @@ Jalankan `supabase-migration.sql` di Supabase SQL Editor.
     ├── app-nilai.js
     ├── app-presensi.js
     ├── app-keaktifan.js
-    └── app-pengaturan.js
+    ├── app-pengaturan.js
+    ├── lp-registry.js        # Field Registry (source of truth field lesson plan)
+    ├── lp-api.js             # CRUD lesson_plans / lp_templates / lp_learning_models
+    ├── lp-ai.js              # prompt builder + adapter Gemini (output JSON)
+    ├── lp-docx.js            # flatten + render docxtemplater (client-side)
+    └── app-lessonplan.js     # UI: list, wizard, editor review, export
 ```
 
+## Fitur Lesson Plan Generator
+
+Alur: **Form → Generate AI (JSON) → Review/Edit oleh guru → Simpan → Download Word**.
+
+- AI hanya menghasilkan isi (JSON); dokumen Word dirakit aplikasi dari template
+  DOCX ber-placeholder (`templates/lesson-plan-sma-v1.docx`) via docxtemplater.
+- **Setup**: isi API Key Gemini di Pengaturan → tab AI Lesson Plan (gratis di
+  [Google AI Studio](https://aistudio.google.com/apikey)).
+- **Menambah model pembelajaran**: INSERT row baru di tabel `lp_learning_models`
+  (kolom `syntax` = daftar langkah). Tanpa mengubah kode.
+- **Menambah template DOCX**: upload file .docx baru (mis. folder `templates/` atau
+  Supabase Storage) + INSERT row di `lp_templates` dengan `manifest` mapping
+  placeholder. Prompt AI tidak berubah.
+- Baris kegiatan inti memakai loop `{{#main_activities}}…{{/main_activities}}`,
+  jadi jumlah langkah bebas mengikuti model pembelajaran.
+- Checkbox (dimensi profil, strategi, metode, asesmen) memakai placeholder
+  `{{chk_<grup>_<opsi>}}` yang diisi simbol ☑/☐.
+
 ## Catatan
-- Fitur Lesson Plan AI dinonaktifkan sementara (butuh proxy untuk API key Gemini)
 - SUPABASE_KEY yang dipakai adalah anon key (public), aman untuk client-side
 - RLS harus dikonfigurasi di Supabase untuk mengatur akses data
+- API key Gemini milik guru disimpan di tabel `app_settings` (aplikasi personal)

@@ -114,11 +114,7 @@ function pindahHalaman(target) {
     if (target === 'jadwalview' && typeof initHalamanJadwalView === 'function') initHalamanJadwalView();
     if (target === 'datamaster' && typeof initHalamanDataMaster === 'function') initHalamanDataMaster();
     if (target === 'pengaturan' && typeof initHalamanPengaturan === 'function') initHalamanPengaturan();
-    if (target === 'lessonplan') {
-        // Lesson Plan disabled temporarily
-        const el = document.getElementById('halaman-lessonplan');
-        if (el) el.innerHTML = '<div class="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center"><p class="text-amber-800 font-bold text-lg mb-2">🚧 Fitur Lesson Plan AI</p><p class="text-amber-700 text-sm">Fitur ini sedang dalam pengembangan untuk versi web. Akan diaktifkan kembali segera.</p></div>';
-    }
+    if (target === 'lessonplan' && typeof initHalamanLessonPlan === 'function') initHalamanLessonPlan();
     if (target === 'quicklinks' && typeof initHalamanQuickLinks === 'function') initHalamanQuickLinks();
     if (target === 'catatansiswa' && typeof initHalamanCatatanSiswa === 'function') initHalamanCatatanSiswa();
     if (target === 'jurnalmengajar' && typeof initHalamanJurnalMengajar === 'function') initHalamanJurnalMengajar();

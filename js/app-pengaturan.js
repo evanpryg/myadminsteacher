@@ -53,6 +53,7 @@ function tampilkanTabPengaturan(tab) {
 
     if (tab === 'import') { muatDaftarSiswaLengkap(); inisialisasiImportSiswa(); }
     if (tab === 'profil') { muatKelasMengajar(); }
+    if (tab === 'prompt' && typeof muatPengaturanAI === 'function') { muatPengaturanAI(); }
 }
 
 // =========================================================
