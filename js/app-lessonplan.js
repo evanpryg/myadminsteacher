@@ -65,6 +65,7 @@ function renderTabelLessonPlan(list) {
             <td class="py-3 px-3">
                 <div class="flex items-center justify-center gap-1">
                     <button onclick="lpEditLessonPlan(${lp.id})" title="Edit" class="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                    <button onclick="lpDownloadPdf(${lp.id}, this)" title="Download PDF" class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"><i data-lucide="file-text" class="w-4 h-4"></i></button>
                     <button onclick="lpDownloadDocx(${lp.id}, this)" title="Download Word" class="p-2 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"><i data-lucide="file-down" class="w-4 h-4"></i></button>
                     <button onclick="lpHapusLessonPlan(${lp.id})" title="Hapus" class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                 </div>
@@ -337,6 +338,7 @@ async function lpRegenerateAI() {
 // ============================================================
 // SIMPAN + EXPORT
 // ============================================================
+// danDownload: 'pdf' | 'docx' | undefined
 async function simpanLessonPlanSekarang(danDownload) {
     const aiData = lpCollectAiData();
     _lpState.aiData = aiData;
@@ -362,10 +364,28 @@ async function simpanLessonPlanSekarang(danDownload) {
     if (!saved) { alert('Gagal menyimpan lesson plan.\n' + (_lastSupabaseError || '')); return; }
 
     if (danDownload) {
-        try { await lpExportDocx(saved); }
-        catch (err) { alert('Tersimpan, tapi gagal membuat Word:\n' + (err.message || err)); }
+        try {
+            if (danDownload === 'pdf') await lpExportPdf(saved);
+            else await lpExportDocx(saved);
+        } catch (err) {
+            alert('Tersimpan, tapi gagal membuat file:\n' + (err.message || err));
+        }
     }
     await initHalamanLessonPlan();
+}
+
+async function lpDownloadPdf(id, btn) {
+    if (btn) btn.classList.add('animate-pulse');
+    try {
+        const lp = await lpGetLessonPlan(id);
+        if (!lp) throw new Error('Lesson plan tidak ditemukan.');
+        await lpExportPdf(lp);
+    } catch (err) {
+        console.error(err);
+        alert('Gagal membuat PDF:\n' + (err.message || err));
+    } finally {
+        if (btn) btn.classList.remove('animate-pulse');
+    }
 }
 
 async function lpDownloadDocx(id, btn) {
@@ -485,12 +505,14 @@ async function lpBuatDariJadwal(index) {
 // PENGATURAN AI (panel "prompt" di halaman Pengaturan)
 // ============================================================
 async function muatPengaturanAI() {
-    const s = await getMultipleSettings([LP_AI_SETTING_KEYS.apiKey, LP_AI_SETTING_KEYS.model, LP_AI_SETTING_KEYS.extra, 'GS_NAMA_KEPALA']);
+    const s = await getMultipleSettings([LP_AI_SETTING_KEYS.apiKey, LP_AI_SETTING_KEYS.model, LP_AI_SETTING_KEYS.extra, 'GS_NAMA_KEPALA', 'GS_LP_PDF_URL', 'GS_LP_FILE_CODE']);
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
     set('pg-gemini-key', s[LP_AI_SETTING_KEYS.apiKey]);
     set('pg-lp-ai-model', s[LP_AI_SETTING_KEYS.model]);
     set('pg-lp-extra', s[LP_AI_SETTING_KEYS.extra]);
     set('pg-prompt-kepala', s.GS_NAMA_KEPALA);
+    set('pg-lp-pdf-url', s.GS_LP_PDF_URL);
+    set('pg-lp-file-code', s.GS_LP_FILE_CODE);
 }
 
 async function simpanPromptSettings() {
@@ -500,6 +522,8 @@ async function simpanPromptSettings() {
     payload[LP_AI_SETTING_KEYS.model] = get('pg-lp-ai-model');
     payload[LP_AI_SETTING_KEYS.extra] = get('pg-lp-extra');
     payload.GS_NAMA_KEPALA = get('pg-prompt-kepala');
+    payload.GS_LP_PDF_URL = get('pg-lp-pdf-url');
+    payload.GS_LP_FILE_CODE = get('pg-lp-file-code');
     await setMultipleSettings(payload);
     alert('Pengaturan AI tersimpan.');
 }

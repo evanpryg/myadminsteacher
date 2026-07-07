@@ -86,8 +86,8 @@ function lpFlattenData(formData, aiData, manifest, teachingModelSlug) {
     return out;
 }
 
-// ---------- RENDER: template ArrayBuffer + data -> Blob .docx ----------
-function lpRenderDocx(templateBuffer, manifest, data) {
+// ---------- RENDER: template ArrayBuffer + data -> Blob/base64 .docx ----------
+function lpRenderDocx(templateBuffer, manifest, data, outputType) {
     if (typeof PizZip === 'undefined' || typeof docxtemplater === 'undefined') {
         throw new Error('Library DOCX belum termuat. Periksa koneksi internet lalu muat ulang halaman.');
     }
@@ -100,6 +100,9 @@ function lpRenderDocx(templateBuffer, manifest, data) {
         nullGetter: function () { return ''; }
     });
     doc.render(data);
+    if (outputType === 'base64') {
+        return doc.getZip().generate({ type: 'base64' });
+    }
     return doc.getZip().generate({
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -119,7 +122,16 @@ function lpDownloadBlob(blob, filename) {
     }, 100);
 }
 
-// ---------- Orkestrasi export ----------
+// ---------- Nama file: LP_<kode>_<kelas>_P<pertemuan> ----------
+// <kode> dikelola di Pengaturan (GS_LP_FILE_CODE), default M16.
+async function lpBuildFilename(lessonPlan) {
+    const code = (await getAppSetting('GS_LP_FILE_CODE', '')) || 'M16';
+    const idn = (lessonPlan.form_data || {}).identity || {};
+    const name = ['LP', code, idn.grade || 'Kelas', 'P' + (idn.meeting || 1)].join('_');
+    return name.replace(/[\\/:*?"<>|\s]+/g, '-').replace(/-_/g, '_').replace(/_-/g, '_');
+}
+
+// ---------- Orkestrasi export Word ----------
 async function lpExportDocx(lessonPlan) {
     const template = await lpGetTemplateById(lessonPlan.template_id);
     if (!template) throw new Error('Template DOCX tidak ditemukan. Jalankan migration & cek tabel lp_templates.');
@@ -127,9 +139,38 @@ async function lpExportDocx(lessonPlan) {
     const buffer = await lpFetchTemplateFile(template);
     const data = lpFlattenData(lessonPlan.form_data, lessonPlan.ai_data, template.manifest, lessonPlan.learning_model_slug);
     const blob = lpRenderDocx(buffer, template.manifest, data);
+    lpDownloadBlob(blob, (await lpBuildFilename(lessonPlan)) + '.docx');
+}
 
-    const idn = (lessonPlan.form_data || {}).identity || {};
-    const cur = (lessonPlan.form_data || {}).curriculum || {};
-    const name = ['Lesson Plan', idn.subject, idn.grade, cur.learning_topic].filter(Boolean).join(' - ');
-    lpDownloadBlob(blob, name.replace(/[\\/:*?"<>|]/g, '') + '.docx');
+// ---------- Orkestrasi export PDF (via konverter Google Apps Script) ----------
+// DOCX dirender di browser, dikirim base64 ke web app Apps Script milik guru,
+// yang mengonversinya lewat mesin Google Docs dan mengembalikan PDF base64.
+async function lpExportPdf(lessonPlan) {
+    const gasUrl = await getAppSetting('GS_LP_PDF_URL', '');
+    if (!gasUrl) {
+        throw new Error('URL Konverter PDF belum diisi.\n\nBuka Pengaturan → tab AI Lesson Plan → "URL Konverter PDF", dan ikuti petunjuk setup di file gas-pdf-converter.gs (sekali saja).');
+    }
+    const template = await lpGetTemplateById(lessonPlan.template_id);
+    if (!template) throw new Error('Template DOCX tidak ditemukan.');
+
+    const buffer = await lpFetchTemplateFile(template);
+    const data = lpFlattenData(lessonPlan.form_data, lessonPlan.ai_data, template.manifest, lessonPlan.learning_model_slug);
+    const docxBase64 = lpRenderDocx(buffer, template.manifest, data, 'base64');
+    const filename = await lpBuildFilename(lessonPlan);
+
+    // Content-Type text/plain agar tetap "simple request" (Apps Script tidak melayani preflight OPTIONS)
+    const resp = await fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ docx: docxBase64, filename: filename })
+    });
+    if (!resp.ok) throw new Error('Konverter PDF error (' + resp.status + '). Cek kembali URL & deployment Apps Script.');
+    const result = await resp.json();
+    if (!result.ok) throw new Error('Konversi PDF gagal: ' + (result.error || 'unknown'));
+
+    // base64 -> Blob PDF
+    const bin = atob(result.pdf);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    lpDownloadBlob(new Blob([bytes], { type: 'application/pdf' }), filename + '.pdf');
 }
