@@ -65,6 +65,7 @@ function renderTabelLessonPlan(list) {
             <td class="py-3 px-3">
                 <div class="flex items-center justify-center gap-1">
                     <button onclick="lpEditLessonPlan(${lp.id})" title="Edit" class="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                    <button onclick="lpBukaDuplikat(${lp.id})" title="Duplikat ke kelas lain" class="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><i data-lucide="copy" class="w-4 h-4"></i></button>
                     <button onclick="lpDownloadPdf(${lp.id}, this)" title="Download PDF" class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"><i data-lucide="file-text" class="w-4 h-4"></i></button>
                     <button onclick="lpDownloadDocx(${lp.id}, this)" title="Download Word" class="p-2 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"><i data-lucide="file-down" class="w-4 h-4"></i></button>
                     <button onclick="lpHapusLessonPlan(${lp.id})" title="Hapus" class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -434,6 +435,125 @@ async function lpHapusLessonPlan(id) {
     if (!confirm('Hapus lesson plan ini? Tindakan tidak dapat dibatalkan.')) return;
     await lpDeleteLessonPlan(id);
     await initHalamanLessonPlan();
+}
+
+// ============================================================
+// DUPLIKAT MASSAL KE BANYAK KELAS
+// Isi (form_data + ai_data) disalin persis; hanya kelas, tanggal,
+// pertemuan, dan karakteristik kelas yang berbeda tiap baris.
+// ============================================================
+const LP_KARAKTERISTIK_OPTS = (lpGetField('class_characteristics') || {}).options
+    || ['Campuran', 'Tinggi (Cepat Paham)', 'Sedang (Standar)', 'Rendah (Butuh Bimbingan Lebih)'];
+
+function lpBarisDuplikatHtml(pref) {
+    pref = pref || {};
+    const inputCls = 'border border-slate-200 rounded-lg px-2 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400';
+    const opts = LP_KARAKTERISTIK_OPTS.map(o =>
+        `<option value="${lpEscape(o)}"${o === pref.karakteristik ? ' selected' : ''}>${lpEscape(o)}</option>`).join('');
+    return `<div class="dup-row grid grid-cols-[1fr_1fr_auto_1fr_auto] gap-2 items-center">
+        <input type="text" class="dup-kelas ${inputCls}" list="dup-dl-kelas" placeholder="XI-B" value="${lpEscape(pref.kelas || '')}">
+        <input type="date" class="dup-tanggal ${inputCls}" value="${lpEscape(pref.tanggal || '')}">
+        <input type="number" min="1" class="dup-pertemuan ${inputCls} w-16 text-center" value="${lpEscape(String(pref.pertemuan || ''))}">
+        <select class="dup-karakteristik ${inputCls} bg-white">${opts}</select>
+        <button onclick="lpHapusBarisDuplikat(this)" class="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+    </div>`;
+}
+
+function lpTambahBarisDuplikat(pref) {
+    const rows = document.getElementById('dup-rows');
+    rows.insertAdjacentHTML('beforeend', lpBarisDuplikatHtml(pref));
+    lucide.createIcons();
+}
+
+function lpHapusBarisDuplikat(btn) {
+    const rows = document.getElementById('dup-rows');
+    if (rows.querySelectorAll('.dup-row').length <= 1) { btn.closest('.dup-row').querySelectorAll('input,select').forEach(el => el.value = ''); return; }
+    btn.closest('.dup-row').remove();
+}
+
+async function lpBukaDuplikat(id) {
+    const lp = await lpGetLessonPlan(id);
+    if (!lp) { alert('Lesson plan tidak ditemukan.'); return; }
+    _lpState.dupSource = lp;
+
+    const idn = (lp.form_data || {}).identity || {};
+    const cur = (lp.form_data || {}).curriculum || {};
+    const ctx = (lp.form_data || {}).ai_context || {};
+    document.getElementById('dup-source-info').innerText =
+        'Menduplikat: ' + [idn.subject, cur.learning_topic].filter(Boolean).join(' – ');
+
+    // Datalist kelas dari data mengajar
+    let kelasList = [];
+    try {
+        const mengajar = (await getDaftarMengajar()) || [];
+        kelasList = [...new Set(mengajar.map(m => m.kelas).filter(Boolean))];
+    } catch (e) { kelasList = []; }
+    document.getElementById('dup-dl-kelas').innerHTML =
+        kelasList.map(k => `<option value="${lpEscape(k)}">`).join('');
+
+    // Prefill: satu baris per kelas mengajar (selain kelas sumber),
+    // tanggal & pertemuan mengikuti sumber sebagai titik awal.
+    const targets = kelasList.filter(k => k !== idn.grade);
+    document.getElementById('dup-rows').innerHTML = '';
+    if (targets.length > 0) {
+        targets.forEach(k => lpTambahBarisDuplikat({
+            kelas: k, tanggal: idn.date || '', pertemuan: idn.meeting || 1,
+            karakteristik: ctx.class_characteristics || LP_KARAKTERISTIK_OPTS[0]
+        }));
+    } else {
+        lpTambahBarisDuplikat({ tanggal: idn.date || '', pertemuan: idn.meeting || 1,
+            karakteristik: ctx.class_characteristics || LP_KARAKTERISTIK_OPTS[0] });
+    }
+
+    document.getElementById('modal-duplikat-lp').classList.remove('hidden');
+    lucide.createIcons();
+}
+
+async function lpProsesDuplikat() {
+    const src = _lpState.dupSource;
+    if (!src) return;
+
+    const rows = Array.from(document.querySelectorAll('#dup-rows .dup-row')).map(r => ({
+        kelas: (r.querySelector('.dup-kelas').value || '').trim(),
+        tanggal: r.querySelector('.dup-tanggal').value,
+        pertemuan: parseInt(r.querySelector('.dup-pertemuan').value, 10) || 1,
+        karakteristik: r.querySelector('.dup-karakteristik').value
+    })).filter(x => x.kelas);
+
+    if (rows.length === 0) { alert('Isi minimal satu kelas tujuan.'); return; }
+
+    const btn = document.getElementById('dup-submit-btn');
+    btn.disabled = true; btn.classList.add('opacity-60');
+    const cur = (src.form_data || {}).curriculum || {};
+    const idnSrc = (src.form_data || {}).identity || {};
+
+    let ok = 0, fail = 0;
+    for (const row of rows) {
+        // Clone dalam (deep) agar tiap salinan independen
+        const formData = JSON.parse(JSON.stringify(src.form_data || {}));
+        formData.identity = formData.identity || {};
+        formData.ai_context = formData.ai_context || {};
+        formData.identity.grade = row.kelas;
+        formData.identity.date = row.tanggal;
+        formData.identity.meeting = row.pertemuan;
+        formData.ai_context.class_characteristics = row.karakteristik;
+
+        const payload = {
+            title: [idnSrc.subject, row.kelas, cur.learning_topic].filter(Boolean).join(' - '),
+            status: src.status || 'draft',
+            template_id: src.template_id,
+            learning_model_slug: src.learning_model_slug,
+            form_data: formData,
+            ai_data: JSON.parse(JSON.stringify(src.ai_data || {}))
+        };
+        const saved = await lpCreateLessonPlan(payload);
+        if (saved) ok++; else fail++;
+    }
+
+    btn.disabled = false; btn.classList.remove('opacity-60');
+    document.getElementById('modal-duplikat-lp').classList.add('hidden');
+    await initHalamanLessonPlan();
+    alert('Berhasil membuat ' + ok + ' lesson plan baru.' + (fail ? ('\nGagal: ' + fail + '.') : ''));
 }
 
 // ============================================================

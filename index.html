@@ -1659,6 +1659,41 @@
     </div>
 </div>
 
+<!-- MODAL: DUPLIKAT LESSON PLAN KE BANYAK KELAS -->
+<div id="modal-duplikat-lp" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <div>
+                <h3 class="font-black text-slate-800 text-lg">Duplikat ke Kelas Lain</h3>
+                <p id="dup-source-info" class="text-xs text-slate-500">—</p>
+            </div>
+            <button onclick="document.getElementById('modal-duplikat-lp').classList.add('hidden')" class="text-slate-400 hover:text-rose-500 transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="p-5 overflow-y-auto space-y-3">
+            <div class="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 text-xs text-indigo-700 font-medium flex items-start gap-2">
+                <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
+                <span>Seluruh isi (materi, tujuan, narasi AI, centang) disalin sama persis. Hanya kolom di bawah yang berbeda tiap kelas.</span>
+            </div>
+            <datalist id="dup-dl-kelas"></datalist>
+            <div class="grid grid-cols-[1fr_1fr_auto_1fr_auto] gap-2 items-center text-[10px] font-black text-slate-400 uppercase tracking-wider px-1">
+                <span>Kelas</span><span>Tanggal</span><span>Pert.</span><span>Karakteristik</span><span></span>
+            </div>
+            <div id="dup-rows" class="space-y-2"></div>
+            <button onclick="lpTambahBarisDuplikat()" class="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-xl transition-colors">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>Tambah Kelas
+            </button>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50">
+            <button onclick="document.getElementById('modal-duplikat-lp').classList.add('hidden')" class="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors border">Batal</button>
+            <button id="dup-submit-btn" onclick="lpProsesDuplikat()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm">
+                <i data-lucide="copy" class="w-4 h-4"></i>Buat Lesson Plan
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 // Dismiss splash screen once page is fully loaded and scripts initialized
 function hideSplashScreen() {
