@@ -58,17 +58,19 @@ function lpFlattenData(formData, aiData, manifest, teachingModelSlug) {
         activity: a.activity || ''
     }));
 
-    // Checkbox: konvensi chk_<group>_<key> + <group>_others
+    // Checkbox: konvensi chk_<docxKey>_<key> + <docxKey>_others
+    // (docxKey = prefix placeholder di template; default = id grup)
     const ped = (formData || {}).pedagogy || {};
     Object.keys(LP_CHECKBOX_GROUPS).forEach(groupId => {
         const grp = LP_CHECKBOX_GROUPS[groupId];
+        const prefix = grp.docxKey || groupId;
         const selected = Array.isArray(ped[groupId]) ? ped[groupId] : [];
         grp.options.forEach(opt => {
-            out['chk_' + groupId + '_' + opt.key] = selected.indexOf(opt.key) !== -1 ? LP_CHECKED : LP_UNCHECKED;
+            out['chk_' + prefix + '_' + opt.key] = selected.indexOf(opt.key) !== -1 ? LP_CHECKED : LP_UNCHECKED;
         });
         const othersText = ped[groupId + '_others'] || '';
-        out['chk_' + groupId + '_others'] = othersText ? LP_CHECKED : LP_UNCHECKED;
-        out[groupId + '_others'] = othersText;
+        out['chk_' + prefix + '_others'] = othersText ? LP_CHECKED : LP_UNCHECKED;
+        out[prefix + '_others'] = othersText;
     });
 
     // Teaching model: single-select -> grup checkbox model di template

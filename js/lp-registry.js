@@ -33,6 +33,7 @@ const LP_SECTIONS = [
 const LP_CHECKBOX_GROUPS = {
     dimensions: {
         label: 'Dimensi Profil Lulusan',
+        docxKey: 'dim',       // prefix placeholder di template: chk_dim_<key>
         options: [
             { key: 'faith',             label: 'Faith and devotion to God Almighty' },
             { key: 'collaboration',     label: 'Collaboration' },
@@ -69,6 +70,7 @@ const LP_CHECKBOX_GROUPS = {
     },
     assessment: {
         label: 'Formative Assessment Strategies',
+        docxKey: 'assess',    // prefix placeholder di template: chk_assess_<key>
         hasOthers: true,
         options: [
             { key: 'question_answer',   label: 'Question and Answer' },
