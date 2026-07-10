@@ -397,3 +397,12 @@
         .splash-logo svg { width: 32px; height: 32px; }
         table th, table td { padding: 0.25rem 0.35rem !important; font-size: 0.6rem !important; }
     }
+
+/* Notification banner animation */
+@keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+}
