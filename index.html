@@ -797,6 +797,10 @@
                                     class="px-4 py-2 text-xs font-bold rounded-xl text-slate-500 hover:bg-slate-100 transition-all">
                                 <i data-lucide="user-cog" class="w-3.5 h-3.5 inline mr-1"></i>Profil & Kelas Mengajar
                             </button>
+                            <button id="pg-tab-bank" onclick="tampilkanTabPengaturan('bank');"
+                                    class="px-4 py-2 text-xs font-bold rounded-xl text-slate-500 hover:bg-slate-100 transition-all">
+                                <i data-lucide="library" class="w-3.5 h-3.5 inline mr-1"></i>Materi &amp; CP/TP
+                            </button>
                             <button id="pg-tab-prompt" onclick="tampilkanTabPengaturan('prompt');"
                                     class="px-4 py-2 text-xs font-bold rounded-xl text-slate-500 hover:bg-slate-100 transition-all">
                                 <i data-lucide="bot" class="w-3.5 h-3.5 inline mr-1"></i>AI Lesson Plan
@@ -1114,6 +1118,46 @@
                                     <button onclick="tambahKelasMengajarUI()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Tambah</button>
                                 </div>
                                 <div id="daftar-kelas-mengajar" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
+                            </div>
+                        </div>
+
+                        <!-- ===== PANEL: BANK MATERI / CP / TP ===== -->
+                        <div id="pg-panel-bank" class="hidden p-5 space-y-4">
+                            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3">
+                                <i data-lucide="library" class="w-5 h-5 text-indigo-600 shrink-0 mt-0.5"></i>
+                                <div>
+                                    <p class="text-sm font-bold text-indigo-800">Bank Materi, CP &amp; TP</p>
+                                    <p class="text-xs text-indigo-700 mt-0.5">Siapkan di awal semester. Saat membuat lesson plan, tinggal ketik &amp; pilih dari dropdown. Entri baru yang ditulis di generator juga otomatis tersimpan ke sini.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <select id="bank-filter-jenis" onchange="filterBankItems()" class="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                    <option value="SEMUA">Semua Jenis</option>
+                                    <option value="MATERI">Materi</option>
+                                    <option value="CP">CP</option>
+                                    <option value="TP">TP</option>
+                                </select>
+                                <input type="text" id="bank-filter-cari" oninput="filterBankItems()" placeholder="Cari mapel / isi..." class="flex-1 min-w-[160px] border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                <button onclick="bukaModalBankItem()" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Tambah</button>
+                            </div>
+                            <div id="bank-loader" class="py-8 text-center text-indigo-500 animate-pulse font-semibold text-sm hidden">Memuat bank...</div>
+                            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left border-collapse" style="min-width:640px;">
+                                        <thead>
+                                            <tr class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                                <th class="py-2.5 px-4 w-20">Jenis</th>
+                                                <th class="py-2.5 px-3 w-36">Mapel</th>
+                                                <th class="py-2.5 px-3 w-14">Fase</th>
+                                                <th class="py-2.5 px-3">Isi</th>
+                                                <th class="py-2.5 px-3 w-20 text-center">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="bank-table-body" class="text-xs font-medium text-slate-600 divide-y divide-slate-100">
+                                            <tr><td colspan="5" class="py-10 text-center text-slate-400 font-semibold">Belum ada data. Jalankan migration <code class="bg-slate-100 px-1 rounded">supabase-migration-cptp.sql</code> lalu klik "+ Tambah".</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
@@ -1540,8 +1584,8 @@
                             <option value="sekali">Hanya tanggal tertentu</option>
                         </select>
                     </div>
-                    <div id="jadwal-tanggal-wrap" class="hidden">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Tanggal</label>
+                    <div id="jadwal-tanggal-wrap">
+                        <label id="jadwal-tanggal-label" class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Berlaku Mulai (Opsional)</label>
                         <input type="date" id="jadwal-tanggal" onchange="sinkronHariDariTanggal()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
                     </div>
                 </div>
@@ -1677,6 +1721,48 @@
         <div class="p-5 overflow-y-auto">
             <div id="jadwal-minggu-loader" class="py-10 text-center text-indigo-500 animate-pulse font-semibold text-sm">Mengambil jadwal minggu depan...</div>
             <div id="jadwal-minggu-list" class="space-y-3 hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: TAMBAH/EDIT ENTRI BANK MATERI/CP/TP -->
+<div id="modal-bank-item" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <h3 id="bank-modal-title" class="font-black text-slate-800 text-lg">Tambah Entri</h3>
+            <button onclick="document.getElementById('modal-bank-item').classList.add('hidden')" class="text-slate-400 hover:text-rose-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div class="p-5 space-y-3">
+            <input type="hidden" id="bank-edit-id" value="">
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Jenis</label>
+                    <select id="bank-item-jenis" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                        <option value="MATERI">Materi</option>
+                        <option value="CP">CP</option>
+                        <option value="TP">TP</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Mata Pelajaran</label>
+                    <input type="text" id="bank-item-subject" list="bank-dl-mapel" placeholder="Fisika" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <datalist id="bank-dl-mapel"></datalist>
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Fase</label>
+                    <select id="bank-item-phase" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                        <option value="F">F</option><option value="E">E</option><option value="">-</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Isi</label>
+                <textarea id="bank-item-content" rows="6" placeholder="Tulis materi / capaian pembelajaran / tujuan pembelajaran..." class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
+            </div>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+            <button onclick="document.getElementById('modal-bank-item').classList.add('hidden')" class="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors border">Batal</button>
+            <button id="bank-simpan-btn" onclick="simpanBankItem()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm"><i data-lucide="save" class="w-4 h-4"></i>Simpan</button>
         </div>
     </div>
 </div>

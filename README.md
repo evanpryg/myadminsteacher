@@ -13,7 +13,7 @@
 
 1. Jalankan `supabase-migration.sql` di Supabase SQL Editor.
 2. Jalankan `supabase-migration-lessonplan.sql` (fitur Lesson Plan Generator).
-3. Jalankan `supabase-migration-cptp.sql` (bank CP & TP untuk lesson plan).
+3. Jalankan `supabase-migration-cptp.sql` (bank Materi/CP/TP — aman dijalankan ulang).
 
 ## Struktur File
 
@@ -82,17 +82,24 @@ Alur: **Form → Generate AI (JSON) → Review/Edit oleh guru → Simpan → Dow
 Guru cukup mengisi: mapel, kelas, tanggal, topik, dan model pembelajaran.
 Sisanya (materi, CP, TP, lintas disiplin, media, sumber, strategi/metode/
 dimensi/asesmen) diisi atau disarankan AI dan tetap bisa diedit di step review.
-CP & TP juga bisa dipilih dari **bank CP/TP** (tabel `lp_cp_tp`) lewat
-dropdown ketik-cari; entri baru otomatis tersimpan ke bank saat generate.
+
+**Bank Materi/CP/TP** (tabel `lp_cp_tp`): dikelola di Pengaturan → tab
+"Materi & CP/TP" (tambah/edit/hapus) — idealnya disiapkan di awal semester.
+Di form generator, field Materi/CP/TP memakai dropdown ketik-cari dari bank;
+entri baru yang ditulis langsung di generator otomatis tersimpan ke bank.
 
 ### Jadwal: sekali vs berulang
 
 - Tambah jadwal (Pengaturan → Jadwal, atau tombol **+** di halaman Jadwal
-  Mengajar per hari): pilih **berulang tiap minggu** (tabel `jadwal_mengajar`)
+  Mengajar per hari): pilih **berulang tiap minggu** (tabel `jadwal_mengajar`,
+  dengan tanggal "berlaku mulai" — tidak muncul di minggu-minggu sebelumnya)
   atau **hanya tanggal tertentu** (override `GS_JADWAL_OVERRIDES`).
 - Hapus dari halaman Jadwal Mengajar: **hapus hari ini saja** (skip per
-  tanggal, bisa di-undo) atau **hapus seterusnya** (seri dihapus dari semua
-  minggu). Agenda dashboard ikut menerapkan override ini.
+  tanggal, bisa di-undo) atau **hapus seterusnya** (seri diakhiri mulai
+  tanggal itu via override `aksi:'end'` — riwayat minggu sebelumnya TETAP
+  tersimpan untuk rekap). Hard delete permanen hanya ada di Pengaturan →
+  Jadwal. Agenda dashboard & modal "Jadwal Minggu Depan" ikut menerapkan
+  semua override ini.
 
 ## Catatan
 - SUPABASE_KEY yang dipakai adalah anon key (public), aman untuk client-side

@@ -139,7 +139,13 @@ async function lpRenderForm(prefill) {
             ? (prefill[f.section] || {})[f.id]
             : (f.settingKey ? settings[f.settingKey] : (f.default !== undefined ? f.default : ''));
         let input = '';
-        if (f.type === 'text' || f.type === 'number' || f.type === 'date') {
+        if (f.type === 'text' && f.bank) {
+            // Typeahead bank (mis. MATERI) pada input teks
+            input = `<div class="relative">
+                <input type="text" id="${id}" value="${lpEscape(String(val))}" data-bank="${f.bank}" autocomplete="off" placeholder="Ketik untuk mencari di bank ${f.bank}, atau tulis baru" class="${inputCls}">
+                <div id="lp-bank-dd-${f.id}" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-40 max-h-64 overflow-y-auto"></div>
+            </div>`;
+        } else if (f.type === 'text' || f.type === 'number' || f.type === 'date') {
             const listAttr = f.datalist ? ` list="lp-dl-${f.datalist}"` : '';
             input = `<input type="${f.type}" id="${id}" value="${lpEscape(String(val))}"${listAttr} class="${inputCls}">`;
         } else if (f.type === 'textarea') {
@@ -691,7 +697,7 @@ async function tampilkanJadwalMingguDepan() {
     listEl.classList.add('hidden');
 
     const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    const jadwal = (await fetchSupabase('/rest/v1/jadwal_mengajar?order=hari.asc,jam_mulai.asc', 'GET')) || [];
+    const [jadwal, overrides] = await Promise.all([getDaftarJadwal(), getJadwalOverrides()]);
 
     // Tanggal Senin minggu depan
     const now = new Date();
@@ -702,9 +708,16 @@ async function tampilkanJadwalMingguDepan() {
     for (let i = 0; i < 6; i++) {
         const d = new Date(senin);
         d.setDate(senin.getDate() + i);
+        const tglIso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
         const hari = HARI[d.getDay()];
-        jadwal.filter(j => j.hari === hari && (j.kategori || 'Normal') === 'Normal').forEach(j => {
-            items.push({ jadwal: j, tanggal: d.toISOString().slice(0, 10), hari });
+        const skipIds = overrides.filter(o => o.tanggal === tglIso && o.aksi === 'skip').map(o => o.jadwalId);
+        jadwal.filter(j => j.hari === hari && (j.kategori || 'Normal') === 'Normal'
+            && !skipIds.includes(j.id) && jadwalSeriesAktif(j.id, tglIso, overrides)).forEach(j => {
+            items.push({ jadwal: j, tanggal: tglIso, hari });
+        });
+        // Jadwal satu-kali (override 'tambah') yang berupa mengajar (punya kelas)
+        overrides.filter(o => o.tanggal === tglIso && o.aksi === 'tambah' && o.kelas).forEach(o => {
+            items.push({ jadwal: { jam_mulai: o.jam_mulai, jam_selesai: o.jam_selesai, kelas: o.kelas, mata_pelajaran: o.mata_pelajaran }, tanggal: tglIso, hari });
         });
     }
 
@@ -741,6 +754,105 @@ async function lpBuatDariJadwal(index) {
     if (!d) return;
     document.getElementById('modal-jadwal-minggu-depan').classList.add('hidden');
     await bukaWizardLessonPlan({ identity: { subject: d.subject, grade: d.grade, date: d.date, duration: d.duration } });
+}
+
+// ============================================================
+// PENGATURAN: BANK MATERI / CP / TP (CRUD)
+// ============================================================
+let _bankItems = [];
+
+async function muatPengaturanBank() {
+    const loader = document.getElementById('bank-loader');
+    if (loader) loader.classList.remove('hidden');
+    try {
+        _bankItems = await lpGetBankSemua();
+        // Datalist mapel dari kelas mengajar
+        try {
+            const mengajar = (await getDaftarMengajar()) || [];
+            const mapel = [...new Set(mengajar.map(m => m.mata_pelajaran).filter(Boolean))];
+            const dl = document.getElementById('bank-dl-mapel');
+            if (dl) dl.innerHTML = mapel.map(m => `<option value="${lpEscape(m)}">`).join('');
+        } catch (e) { /* opsional */ }
+        filterBankItems();
+    } catch (err) {
+        console.error(err);
+    } finally {
+        if (loader) loader.classList.add('hidden');
+    }
+}
+
+function filterBankItems() {
+    const tbody = document.getElementById('bank-table-body');
+    if (!tbody) return;
+    const jenis = (document.getElementById('bank-filter-jenis') || {}).value || 'SEMUA';
+    const cari = ((document.getElementById('bank-filter-cari') || {}).value || '').toLowerCase();
+
+    let items = _bankItems;
+    if (jenis !== 'SEMUA') items = items.filter(i => i.jenis === jenis);
+    if (cari) items = items.filter(i => (i.content || '').toLowerCase().includes(cari) || (i.subject || '').toLowerCase().includes(cari));
+
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-400 font-semibold">Belum ada data yang cocok. Klik "+ Tambah" untuk menyiapkan Materi/CP/TP awal semester.</td></tr>';
+        return;
+    }
+    const jenisBadge = { MATERI: 'bg-sky-50 text-sky-600', CP: 'bg-violet-50 text-violet-600', TP: 'bg-emerald-50 text-emerald-600' };
+    tbody.innerHTML = items.map(i => `<tr class="hover:bg-slate-50 transition-colors align-top">
+        <td class="py-2.5 px-4"><span class="text-[10px] font-black px-2 py-1 rounded-lg ${jenisBadge[i.jenis] || 'bg-slate-100 text-slate-500'}">${lpEscape(i.jenis)}</span></td>
+        <td class="py-2.5 px-3 font-bold text-slate-700">${lpEscape(i.subject || '-')}</td>
+        <td class="py-2.5 px-3">${lpEscape(i.phase || '-')}</td>
+        <td class="py-2.5 px-3 text-slate-600 leading-snug">${lpEscape(i.content.length > 220 ? i.content.slice(0, 220) + '…' : i.content)}</td>
+        <td class="py-2.5 px-3">
+            <div class="flex items-center justify-center gap-1">
+                <button onclick="bukaModalBankItem(${i.id})" title="Edit" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                <button onclick="hapusBankItemUI(${i.id})" title="Hapus" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+        </td>
+    </tr>`).join('');
+    lucide.createIcons();
+}
+
+function bukaModalBankItem(id) {
+    const item = id ? _bankItems.find(i => i.id === id) : null;
+    document.getElementById('bank-modal-title').innerText = item ? 'Edit Entri' : 'Tambah Entri';
+    document.getElementById('bank-edit-id').value = item ? item.id : '';
+    document.getElementById('bank-item-jenis').value = item ? item.jenis : ((document.getElementById('bank-filter-jenis') || {}).value !== 'SEMUA' ? document.getElementById('bank-filter-jenis').value : 'MATERI');
+    document.getElementById('bank-item-subject').value = item ? (item.subject || '') : '';
+    document.getElementById('bank-item-phase').value = item ? (item.phase || 'F') : 'F';
+    document.getElementById('bank-item-content').value = item ? item.content : '';
+    document.getElementById('modal-bank-item').classList.remove('hidden');
+    lucide.createIcons();
+}
+
+async function simpanBankItem() {
+    const id = document.getElementById('bank-edit-id').value;
+    const payload = {
+        jenis: document.getElementById('bank-item-jenis').value,
+        subject: document.getElementById('bank-item-subject').value.trim(),
+        phase: document.getElementById('bank-item-phase').value,
+        content: document.getElementById('bank-item-content').value.trim()
+    };
+    if (!payload.content) { alert('Isi tidak boleh kosong.'); return; }
+    const btn = document.getElementById('bank-simpan-btn');
+    btn.disabled = true;
+    try {
+        const saved = id ? await lpUpdateBankItem(parseInt(id, 10), payload) : await lpTambahBankItem(payload);
+        if (!saved) throw new Error(_lastSupabaseError || 'Gagal menyimpan. Sudah menjalankan supabase-migration-cptp.sql?');
+        document.getElementById('modal-bank-item').classList.add('hidden');
+        await muatPengaturanBank();
+    } catch (err) {
+        alert('Gagal: ' + (err.message || err));
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function hapusBankItemUI(id) {
+    const item = _bankItems.find(i => i.id === id);
+    if (!item) return;
+    if (!confirm('Hapus entri ' + item.jenis + (item.subject ? ' (' + item.subject + ')' : '') + ' ini dari bank?')) return;
+    await lpHapusBankItem(item.jenis, id);
+    lpBankInvalidate();
+    await muatPengaturanBank();
 }
 
 // ============================================================

@@ -72,6 +72,27 @@ async function lpHapusBankItem(jenis, id) {
     if (_lpBankCache[jenis]) _lpBankCache[jenis] = _lpBankCache[jenis].filter(i => i.id !== id);
 }
 
+async function lpUpdateBankItem(id, payload) {
+    const data = await fetchSupabase('/rest/v1/lp_cp_tp?id=eq.' + id, 'PATCH', payload);
+    lpBankInvalidate();
+    return (data && data[0]) || null;
+}
+
+async function lpTambahBankItem(payload) {
+    const data = await fetchSupabase('/rest/v1/lp_cp_tp', 'POST', payload);
+    lpBankInvalidate();
+    return (data && data[0]) || null;
+}
+
+// Semua entri bank (untuk halaman pengaturan)
+async function lpGetBankSemua() {
+    return (await fetchSupabase('/rest/v1/lp_cp_tp?order=jenis.asc,subject.asc,created_at.desc&limit=1000', 'GET')) || [];
+}
+
+function lpBankInvalidate() {
+    Object.keys(_lpBankCache).forEach(k => delete _lpBankCache[k]);
+}
+
 // ---------- Lesson Plans CRUD ----------
 async function lpGetLessonPlans() {
     const data = await fetchSupabase('/rest/v1/lesson_plans?select=id,title,status,learning_model_slug,form_data,created_at,updated_at&order=created_at.desc', 'GET');

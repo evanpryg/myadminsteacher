@@ -40,7 +40,7 @@ async function initHalamanPengaturan() {
 }
 
 function tampilkanTabPengaturan(tab) {
-    ['semester','import','export','jadwal','profil','prompt'].forEach(function(t) {
+    ['semester','import','export','jadwal','profil','bank','prompt'].forEach(function(t) {
         const panel = document.getElementById('pg-panel-' + t);
         const btn   = document.getElementById('pg-tab-' + t);
         if (panel) panel.classList.add('hidden');
@@ -54,6 +54,7 @@ function tampilkanTabPengaturan(tab) {
     if (tab === 'import') { muatDaftarSiswaLengkap(); inisialisasiImportSiswa(); }
     if (tab === 'profil') { muatKelasMengajar(); }
     if (tab === 'prompt' && typeof muatPengaturanAI === 'function') { muatPengaturanAI(); }
+    if (tab === 'bank' && typeof muatPengaturanBank === 'function') { muatPengaturanBank(); }
 }
 
 // =========================================================
@@ -503,10 +504,10 @@ function tutupModalJadwal() { document.getElementById('modal-jadwal')?.classList
 
 function toggleJadwalPengulangan() {
     const sekali = document.getElementById('jadwal-pengulangan')?.value === 'sekali';
-    const tglWrap = document.getElementById('jadwal-tanggal-wrap');
+    const tglLabel = document.getElementById('jadwal-tanggal-label');
     const hariSel = document.getElementById('jadwal-hari');
-    if (tglWrap) tglWrap.classList.toggle('hidden', !sekali);
-    // Saat "hanya tanggal tertentu", hari otomatis mengikuti tanggal
+    // Mingguan: tanggal = "berlaku mulai" (opsional). Sekali: tanggal wajib & hari mengikuti tanggal.
+    if (tglLabel) tglLabel.textContent = sekali ? 'Tanggal' : 'Berlaku Mulai (Opsional)';
     if (hariSel) hariSel.disabled = sekali;
     if (sekali) sinkronHariDariTanggal();
 }
@@ -515,8 +516,11 @@ function sinkronHariDariTanggal() {
     const tgl = document.getElementById('jadwal-tanggal')?.value;
     const hariSel = document.getElementById('jadwal-hari');
     if (!tgl || !hariSel) return;
+    // Sinkron hari otomatis (utk mode sekali; utk mingguan hanya sbg bantuan awal)
     const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    hariSel.value = HARI[new Date(tgl + 'T00:00:00').getDay()] || 'Senin';
+    if (document.getElementById('jadwal-pengulangan')?.value === 'sekali' || !hariSel.dataset.touched) {
+        hariSel.value = HARI[new Date(tgl + 'T00:00:00').getDay()] || 'Senin';
+    }
 }
 
 function toggleJadwalKategori() {
@@ -578,6 +582,10 @@ async function simpanJadwal() {
             result = { success: true };
         } else {
             result = await tambahJadwal(jadwal);
+            // Seri baru dengan tanggal "berlaku mulai": tidak tampil di minggu-minggu sebelum tanggal itu
+            if (result && result.success && result.id && tanggal) {
+                await simpanJadwalOverride({ tanggal: tanggal, jadwalId: result.id, aksi: 'start' });
+            }
         }
         if (result && result.success) {
             _onJadwalSaved();
@@ -592,7 +600,7 @@ async function simpanJadwal() {
 function _editJadwal(rowNum) { bukaModalJadwal(rowNum); }
 
 async function _hapusJadwal(rowNum, label) {
-    if (!confirm(`Hapus jadwal "${label}"?`)) return;
+    if (!confirm(`Hapus PERMANEN jadwal "${label}"?\n\nSeri ini akan hilang dari SEMUA minggu, termasuk riwayat minggu sebelumnya.\nJika hanya ingin mengakhirinya mulai tanggal tertentu (riwayat tetap tersimpan), gunakan tombol hapus di halaman "Jadwal Mengajar".`)) return;
     try {
         await hapusJadwal(rowNum);
         _onJadwalSaved();
@@ -1261,11 +1269,11 @@ async function _undoSkipJadwal(tanggal, jadwalId) {
     }
 }
 
-// Hapus jadwal berulang untuk SEMUA minggu (hapus seri dari database)
-async function _hapusJadwalSeri(jadwalId, label) {
-    if (!confirm('Hapus "' + (label || 'jadwal ini') + '" untuk SETERUSNYA?\n\nJadwal berulang ini akan dihapus dari SEMUA minggu (termasuk minggu-minggu berikutnya).')) return;
+// Akhiri jadwal berulang mulai tanggal tertentu (riwayat minggu sebelumnya TETAP tersimpan)
+async function _hapusJadwalSeri(jadwalId, label, tglIso) {
+    if (!confirm('Hapus "' + (label || 'jadwal ini') + '" mulai ' + tglIso + ' dan SETERUSNYA?\n\nMinggu-minggu SEBELUMNYA tetap tersimpan sebagai riwayat/rekap mengajar.')) return;
     try {
-        await hapusJadwal(jadwalId);
+        await simpanJadwalOverride({ tanggal: tglIso, jadwalId: jadwalId, aksi: 'end' });
         _muatJadwalView();
     } catch (err) {
         alert('Gagal: ' + (err.message || err));
@@ -1322,6 +1330,10 @@ async function simpanJadwalOneTime() {
                 kelas: kelas, mata_pelajaran: mapel, ruang: '', kategori: kategori
             });
             if (!result || !result.success) throw new Error(result?.message || 'Gagal menyimpan.');
+            // Berulang MULAI tanggal yang dipilih (tidak muncul di minggu-minggu sebelumnya)
+            if (result.id && tanggal) {
+                await simpanJadwalOverride({ tanggal: tanggal, jadwalId: result.id, aksi: 'start' });
+            }
         } else {
             await simpanJadwalOverride({
                 tanggal: tanggal, aksi: 'tambah', id: 'ot' + Date.now(),
@@ -1370,7 +1382,7 @@ function _renderJadwalView() {
         const isToday = tglObj.toDateString() === now.toDateString();
         const color = hariColors[idx];
 
-        const jadwalHari = _jadwalAllData.filter(j => j.hari === hari);
+        const jadwalHari = _jadwalAllData.filter(j => j.hari === hari && jadwalSeriesAktif(j.id, tglIso, _jadwalOverrides));
         jadwalHari.sort((a,b) => (a.jam_mulai || '').localeCompare(b.jam_mulai || ''));
 
         const skippedIds = _jadwalOverrides.filter(o => o.tanggal === tglIso && o.aksi === 'skip').map(o => o.jadwalId);
@@ -1404,7 +1416,7 @@ function _renderJadwalView() {
                     <p class="text-[11px] text-${color}-700 font-semibold">${_esc(j.mata_pelajaran || j.mapel)}</p>
                     <div class="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity">
                         <button onclick="_skipJadwal(${j.id},'${tglIso}','${label}')" title="Hapus hari ini saja" class="p-1 rounded-md bg-white/80 text-slate-400 hover:text-amber-600 hover:bg-amber-50 border border-slate-200"><i data-lucide="calendar-x" class="w-3.5 h-3.5"></i></button>
-                        <button onclick="_hapusJadwalSeri(${j.id},'${label}')" title="Hapus seterusnya (semua minggu)" class="p-1 rounded-md bg-white/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        <button onclick="_hapusJadwalSeri(${j.id},'${label}','${tglIso}')" title="Hapus mulai tanggal ini & seterusnya (riwayat aman)" class="p-1 rounded-md bg-white/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                     </div>
                 </div>`;
             });

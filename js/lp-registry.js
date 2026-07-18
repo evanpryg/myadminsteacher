@@ -98,7 +98,7 @@ const LP_FIELD_REGISTRY = [
     // ---------- STATIC: kurikulum ----------
     // aiFallback: jika guru mengosongkan, AI yang mengisi (tetap bisa diedit di step review)
     // bank     : field terhubung ke bank CP/TP (typeahead - ketik lalu pilih dari dropdown)
-    { id: 'learning_material',    label: 'Materi Pelajaran (opsional - AI mengisi jika kosong)', type: 'text',     source: 'static', placeholder: 'learning_material',    section: 'curriculum', aiFallback: true },
+    { id: 'learning_material',    label: 'Materi Pelajaran (opsional - AI mengisi jika kosong)', type: 'text',     source: 'static', placeholder: 'learning_material',    section: 'curriculum', aiFallback: true, bank: 'MATERI' },
     { id: 'learning_topic',       label: 'Topik Pembelajaran',                                    type: 'text',     source: 'static', placeholder: 'learning_topic',       section: 'curriculum', required: true },
     { id: 'learning_achievement', label: 'Capaian Pembelajaran (CP)',                             type: 'textarea', source: 'static', placeholder: 'learning_achievement', section: 'curriculum', aiFallback: true, bank: 'CP' },
     { id: 'learning_objectives',  label: 'Tujuan Pembelajaran (TP)',                              type: 'textarea', source: 'static', placeholder: 'learning_objectives',  section: 'curriculum', aiFallback: true, bank: 'TP' },

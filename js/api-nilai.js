@@ -153,7 +153,7 @@ async function tambahJadwal(jadwal) {
         kategori: jadwal.kategori || 'Normal'
     };
     const res = await fetchSupabase("/rest/v1/jadwal_mengajar", "POST", payload);
-    if (res) return { success: true };
+    if (res) return { success: true, id: (res[0] && res[0].id) || null };
     return { success: false, message: 'Gagal menyimpan jadwal: ' + (_lastSupabaseError || 'Unknown error') };
 }
 
@@ -310,6 +310,22 @@ async function hapusJadwalOverride(tanggal, jadwalId) {
     return { success: true };
 }
 
+// Apakah sebuah seri jadwal berulang aktif pada tanggal tertentu?
+// Siklus hidup seri disimpan sebagai override {aksi:'start'|'end', jadwalId, tanggal}
+// sehingga menghapus "seterusnya" TIDAK menghapus riwayat minggu sebelumnya.
+function jadwalSeriesAktif(jadwalId, tglIso, overrides) {
+    const events = (overrides || [])
+        .filter(o => o.jadwalId === jadwalId && (o.aksi === 'start' || o.aksi === 'end') && o.tanggal)
+        .sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+    if (events.length === 0) return true;                       // seri lama tanpa siklus: selalu aktif
+    const sebelum = events.filter(e => e.tanggal <= tglIso);
+    if (sebelum.length === 0) {
+        // Belum ada event <= tanggal ini: aktif hanya jika seri tidak punya tanggal mulai
+        return !events.some(e => e.aksi === 'start');
+    }
+    return sebelum[sebelum.length - 1].aksi === 'start';
+}
+
 // Hapus jadwal satu-kali (override aksi 'tambah') berdasarkan id override
 async function hapusJadwalTambahan(tanggal, otId) {
     let overrides = await getJadwalOverrides();
@@ -363,7 +379,8 @@ async function getDashboardData() {
     const skipHariIni = overrides.filter(o => o.tanggal === tglIni && o.aksi === 'skip').map(o => o.jadwalId);
     const tambahanHariIni = overrides.filter(o => o.tanggal === tglIni && o.aksi === 'tambah');
 
-    const agenda = (jadwal || []).filter(j => j.hari === hariIni && !skipHariIni.includes(j.id)).map(j => {
+    const agenda = (jadwal || []).filter(j => j.hari === hariIni && !skipHariIni.includes(j.id)
+        && jadwalSeriesAktif(j.id, tglIni, overrides)).map(j => {
         let jam_mulai = '', jam_selesai = '';
         if (j.jam_ke) { const p = j.jam_ke.split(/[-\s]+/); jam_mulai = (p[0]||'').trim(); jam_selesai = (p[1]||'').trim(); }
         return {
