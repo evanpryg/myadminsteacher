@@ -457,6 +457,15 @@ function bukaModalJadwal(rowNum) {
         dlMapel.innerHTML = mapelUnik.map(m => `<option value="${_esc(m)}">`).join('');
     }
 
+    // Pengulangan: default berulang; saat edit, hanya seri berulang yang bisa diedit
+    const pengulanganWrap = document.getElementById('jadwal-pengulangan-wrap');
+    const pengulanganSel = document.getElementById('jadwal-pengulangan');
+    if (pengulanganSel) pengulanganSel.value = 'mingguan';
+    const tglInput = document.getElementById('jadwal-tanggal');
+    if (tglInput) tglInput.value = '';
+    if (pengulanganWrap) pengulanganWrap.classList.toggle('hidden', !!rowNum);
+    toggleJadwalPengulangan();
+
     if (rowNum) {
         const j = (_pgData.jadwal || []).find(x => x.id === rowNum);
         if (j) {
@@ -491,6 +500,24 @@ function bukaModalJadwal(rowNum) {
 }
 
 function tutupModalJadwal() { document.getElementById('modal-jadwal')?.classList.add('hidden'); }
+
+function toggleJadwalPengulangan() {
+    const sekali = document.getElementById('jadwal-pengulangan')?.value === 'sekali';
+    const tglWrap = document.getElementById('jadwal-tanggal-wrap');
+    const hariSel = document.getElementById('jadwal-hari');
+    if (tglWrap) tglWrap.classList.toggle('hidden', !sekali);
+    // Saat "hanya tanggal tertentu", hari otomatis mengikuti tanggal
+    if (hariSel) hariSel.disabled = sekali;
+    if (sekali) sinkronHariDariTanggal();
+}
+
+function sinkronHariDariTanggal() {
+    const tgl = document.getElementById('jadwal-tanggal')?.value;
+    const hariSel = document.getElementById('jadwal-hari');
+    if (!tgl || !hariSel) return;
+    const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    hariSel.value = HARI[new Date(tgl + 'T00:00:00').getDay()] || 'Senin';
+}
 
 function toggleJadwalKategori() {
     const kategori = document.getElementById('jadwal-kategori')?.value;
@@ -527,15 +554,28 @@ async function simpanJadwal() {
         };
     }
 
+    // Jadwal sekali (hanya tanggal tertentu) -> disimpan sebagai override, bukan seri mingguan
+    const pengulangan = _pgEditJadwalRow ? 'mingguan' : gv('jadwal-pengulangan');
+    const tanggal = gv('jadwal-tanggal');
+    if (pengulangan === 'sekali' && !tanggal) { alert('Pilih tanggal untuk jadwal satu kali.'); return; }
+
     const btn = document.querySelector('#modal-jadwal [onclick="simpanJadwal()"]');
     if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
-    
-    console.log('[TeachMate] Simpan jadwal payload:', jadwal);
+
+    console.log('[TeachMate] Simpan jadwal payload:', jadwal, 'pengulangan:', pengulangan);
 
     try {
         let result;
         if (_pgEditJadwalRow) {
             result = await updateJadwal(_pgEditJadwalRow, jadwal);
+        } else if (pengulangan === 'sekali') {
+            await simpanJadwalOverride({
+                tanggal: tanggal, aksi: 'tambah', id: 'ot' + Date.now(),
+                jam_mulai: jadwal.jam_mulai, jam_selesai: jadwal.jam_selesai,
+                kelas: jadwal.kelas, mata_pelajaran: jadwal.mata_pelajaran,
+                ruang: jadwal.ruang, kategori: jadwal.kategori
+            });
+            result = { success: true };
         } else {
             result = await tambahJadwal(jadwal);
         }
@@ -1201,8 +1241,9 @@ async function _muatJadwalView() {
     }
 }
 
-async function _skipJadwal(jadwalId, tanggal) {
-    if (!confirm('Skip jadwal ini untuk tanggal ' + tanggal + '?')) return;
+// Hapus jadwal berulang HANYA untuk satu tanggal (minggu lain tetap ada)
+async function _skipJadwal(jadwalId, tanggal, label) {
+    if (!confirm('Hapus "' + (label || 'jadwal ini') + '" untuk tanggal ' + tanggal + ' SAJA?\n\nJadwal di minggu-minggu lain tetap ada.')) return;
     try {
         await simpanJadwalOverride({ tanggal: tanggal, jadwalId: jadwalId, aksi: 'skip' });
         _muatJadwalView();
@@ -1214,6 +1255,81 @@ async function _skipJadwal(jadwalId, tanggal) {
 async function _undoSkipJadwal(tanggal, jadwalId) {
     try {
         await hapusJadwalOverride(tanggal, jadwalId);
+        _muatJadwalView();
+    } catch (err) {
+        alert('Gagal: ' + (err.message || err));
+    }
+}
+
+// Hapus jadwal berulang untuk SEMUA minggu (hapus seri dari database)
+async function _hapusJadwalSeri(jadwalId, label) {
+    if (!confirm('Hapus "' + (label || 'jadwal ini') + '" untuk SETERUSNYA?\n\nJadwal berulang ini akan dihapus dari SEMUA minggu (termasuk minggu-minggu berikutnya).')) return;
+    try {
+        await hapusJadwal(jadwalId);
+        _muatJadwalView();
+    } catch (err) {
+        alert('Gagal: ' + (err.message || err));
+    }
+}
+
+// Hapus jadwal satu-kali (override 'tambah') di tanggal tertentu
+async function _hapusJadwalTambahanUI(tanggal, otId, label) {
+    if (!confirm('Hapus jadwal satu kali "' + (label || '') + '" pada ' + tanggal + '?')) return;
+    try {
+        await hapusJadwalTambahan(tanggal, otId);
+        _muatJadwalView();
+    } catch (err) {
+        alert('Gagal: ' + (err.message || err));
+    }
+}
+
+// ── Modal tambah jadwal dari view mingguan (per tanggal) ──
+function bukaModalJadwalOneTime(tanggal, hari) {
+    const modal = document.getElementById('modal-jadwal-onetime');
+    if (!modal) return;
+    document.getElementById('jot-tanggal').value = tanggal;
+    const d = new Date(tanggal + 'T00:00:00');
+    document.getElementById('jot-tanggal-label').textContent = hari + ', ' + _fmtTglShort(d) + ' ' + d.getFullYear();
+    document.getElementById('jot-mapel').value = '';
+    document.getElementById('jot-kelas').value = '';
+    document.getElementById('jot-jam-mulai').value = '';
+    document.getElementById('jot-jam-selesai').value = '';
+    const sel = document.getElementById('jot-pengulangan');
+    if (sel) {
+        sel.value = 'sekali';
+        sel.options[0].text = 'Hanya ' + hari + ' ini (' + _fmtTglShort(d) + ')';
+        sel.options[1].text = 'Berulang tiap ' + hari + ' (jam sama)';
+    }
+    modal.classList.remove('hidden');
+    lucide.createIcons();
+}
+
+async function simpanJadwalOneTime() {
+    const gv = id => document.getElementById(id)?.value?.trim() || '';
+    const tanggal = gv('jot-tanggal');
+    const mapel = gv('jot-mapel');
+    const kelas = gv('jot-kelas');
+    if (!mapel) { alert('Nama Kegiatan / Mapel wajib diisi.'); return; }
+
+    const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const hari = HARI[new Date(tanggal + 'T00:00:00').getDay()];
+    const kategori = kelas ? 'Normal' : 'Kegiatan';
+
+    try {
+        if (gv('jot-pengulangan') === 'mingguan') {
+            const result = await tambahJadwal({
+                hari: hari, jam_mulai: gv('jot-jam-mulai'), jam_selesai: gv('jot-jam-selesai'),
+                kelas: kelas, mata_pelajaran: mapel, ruang: '', kategori: kategori
+            });
+            if (!result || !result.success) throw new Error(result?.message || 'Gagal menyimpan.');
+        } else {
+            await simpanJadwalOverride({
+                tanggal: tanggal, aksi: 'tambah', id: 'ot' + Date.now(),
+                jam_mulai: gv('jot-jam-mulai'), jam_selesai: gv('jot-jam-selesai'),
+                kelas: kelas, mata_pelajaran: mapel, ruang: '', kategori: kategori
+            });
+        }
+        document.getElementById('modal-jadwal-onetime').classList.add('hidden');
         _muatJadwalView();
     } catch (err) {
         alert('Gagal: ' + (err.message || err));
@@ -1266,20 +1382,53 @@ function _renderJadwalView() {
                     <p class="font-bold text-sm">${hari}</p>
                     <p class="text-[10px] ${isToday ? 'text-indigo-200' : 'text-slate-400'}">${_fmtTglShort(tglObj)}</p>
                 </div>
+                <button onclick="bukaModalJadwalOneTime('${tglIso}','${hari}')" title="Tambah jadwal ${hari} ini"
+                    class="p-1.5 rounded-lg ${isToday ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'} transition-colors">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                </button>
             </div>
             <div class="p-3 flex-1 space-y-2">`;
 
         const visibleJadwal = jadwalHari.filter(j => !skippedIds.includes(j.id));
-        if (visibleJadwal.length === 0 && tambahan.length === 0) {
+        const skippedJadwal = jadwalHari.filter(j => skippedIds.includes(j.id));
+        if (visibleJadwal.length === 0 && tambahan.length === 0 && skippedJadwal.length === 0) {
             html += `<p class="text-xs text-slate-400 text-center py-4">Tidak ada jadwal</p>`;
         } else {
             visibleJadwal.forEach(function(j) {
+                const label = _esc((j.kelas ? j.kelas + ' - ' : '') + (j.mata_pelajaran || j.mapel || ''));
                 html += `<div class="bg-${color}-50 border border-${color}-200 rounded-xl p-3 space-y-1 group/card relative">
                     <div class="flex items-center gap-2">
                         <span class="text-[10px] font-black text-${color}-600 bg-${color}-100 px-2 py-0.5 rounded-md">${j.jam_mulai || '?'} – ${j.jam_selesai || '?'}</span>
                     </div>
                     ${j.kelas ? `<p class="font-bold text-slate-800 text-xs">${_esc(j.kelas)}</p>` : ''}
                     <p class="text-[11px] text-${color}-700 font-semibold">${_esc(j.mata_pelajaran || j.mapel)}</p>
+                    <div class="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                        <button onclick="_skipJadwal(${j.id},'${tglIso}','${label}')" title="Hapus hari ini saja" class="p-1 rounded-md bg-white/80 text-slate-400 hover:text-amber-600 hover:bg-amber-50 border border-slate-200"><i data-lucide="calendar-x" class="w-3.5 h-3.5"></i></button>
+                        <button onclick="_hapusJadwalSeri(${j.id},'${label}')" title="Hapus seterusnya (semua minggu)" class="p-1 rounded-md bg-white/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                </div>`;
+            });
+            tambahan.forEach(function(o) {
+                const label = _esc((o.kelas ? o.kelas + ' - ' : '') + (o.mata_pelajaran || ''));
+                html += `<div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1 group/card relative">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-md">${o.jam_mulai || '?'} – ${o.jam_selesai || '?'}</span>
+                        <span class="text-[9px] font-black text-white bg-emerald-500 px-1.5 py-0.5 rounded-md uppercase">Sekali</span>
+                    </div>
+                    ${o.kelas ? `<p class="font-bold text-slate-800 text-xs">${_esc(o.kelas)}</p>` : ''}
+                    <p class="text-[11px] text-emerald-700 font-semibold">${_esc(o.mata_pelajaran)}</p>
+                    <div class="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                        <button onclick="_hapusJadwalTambahanUI('${tglIso}','${_esc(o.id)}','${label}')" title="Hapus jadwal satu kali ini" class="p-1 rounded-md bg-white/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                </div>`;
+            });
+            skippedJadwal.forEach(function(j) {
+                html += `<div class="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2 opacity-70">
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-bold text-slate-400 line-through">${j.jam_mulai || '?'} – ${j.jam_selesai || '?'} · ${_esc((j.kelas ? j.kelas + ' ' : '') + (j.mata_pelajaran || j.mapel || ''))}</p>
+                        <p class="text-[9px] text-slate-400 font-semibold uppercase">Dihapus hari ini</p>
+                    </div>
+                    <button onclick="_undoSkipJadwal('${tglIso}',${j.id})" title="Kembalikan" class="shrink-0 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-200">Undo</button>
                 </div>`;
             });
         }

@@ -21,8 +21,6 @@ const LP_AI_SETTING_KEYS = {
 function lpBuildPrompt(formData, model, extra) {
     const idn = formData.identity || {};
     const cur = formData.curriculum || {};
-    const ped = formData.pedagogy || {};
-    const res = formData.resources || {};
     const ctx = formData.ai_context || {};
 
     const language = ctx.language || 'English';
@@ -32,37 +30,40 @@ function lpBuildPrompt(formData, model, extra) {
         `${i + 1}. key="${s.key}", label="${s.label}" — ${s.hint || ''}`).join('\n');
 
     // Field naratif AI diambil dari registry (source: 'ai'),
-    // kecuali main_activities & time_closing yang punya struktur khusus.
+    // kecuali main_activities, time_closing & checkbox yang punya struktur khusus.
     const narrativeFields = lpFieldsBySource('ai')
         .filter(f => f.type === 'textarea')
         .map(f => `- "${f.id}": (string) ${f.label}`)
         .join('\n');
 
-    const checkedLabels = (groupId, keys) => {
-        const grp = LP_CHECKBOX_GROUPS[groupId];
-        if (!grp || !Array.isArray(keys)) return '-';
-        return keys.map(k => (grp.options.find(o => o.key === k) || {}).label || k).join(', ') || '-';
-    };
+    // Field statis yang dikosongkan guru -> AI yang mengisi (aiFallback)
+    const fallbackFields = LP_FIELD_REGISTRY
+        .filter(f => f.aiFallback && !((formData[f.section] || {})[f.id] || '').toString().trim())
+        .map(f => `- "${f.id}": (string) ${f.label.replace(/ \(opsional[^)]*\)/i, '')} — the teacher left this empty, generate an appropriate one`)
+        .join('\n');
+
+    // Checkbox yang disarankan AI: daftar opsi valid per grup
+    const checkboxFields = lpFieldsBySource('ai')
+        .filter(f => f.type === 'checkbox-group')
+        .map(f => {
+            const grp = LP_CHECKBOX_GROUPS[f.group];
+            const opts = grp.options.map(o => `"${o.key}" (${o.label})`).join(', ');
+            return `- "${f.id}": (array of strings) pick the most fitting option keys for this lesson from EXACTLY: ${opts}`;
+        })
+        .join('\n');
+
+    const ctxLine = (label, val) => val ? `- ${label}: ${val}\n` : '';
 
     return `You are an expert instructional designer for Indonesian senior high school (SMA) under Kurikulum Merdeka, working at an Islamic school (SMA Progresif Bumi Shalawat Sidoarjo).
 
-Create the narrative content of a lesson plan based on this context:
+Create the content of a lesson plan based on this context:
 
 ## Lesson Context
 - Subject: ${idn.subject || '-'}
 - Class/Grade: ${idn.grade || '-'} (Fase ${idn.phase || 'F'})
 - Meeting number: ${idn.meeting || 1}, total duration: ${duration} minutes
-- Learning material: ${cur.learning_material || '-'}
 - Learning topic: ${cur.learning_topic || '-'}
-- Learning achievement (CP): ${cur.learning_achievement || '-'}
-- Learning objectives: ${cur.learning_objectives || '-'}
-- Cross-disciplinary connections: ${cur.cdc || '-'}
-- Teaching strategies: ${checkedLabels('strategy', ped.strategy)}
-- Teaching methods: ${checkedLabels('method', ped.method)}
-- Graduate profile dimensions to develop: ${checkedLabels('dimensions', ped.dimensions)}
-- Learning media: ${res.learning_media || '-'}
-- Learning resources: ${res.resources || '-'}
-- Class characteristics: ${ctx.class_characteristics || 'Campuran'}
+${ctxLine('Learning material (bab)', cur.learning_material)}${ctxLine('Learning achievement (CP)', cur.learning_achievement)}${ctxLine('Learning objectives (TP)', cur.learning_objectives)}- Class characteristics: ${ctx.class_characteristics || 'Campuran'}
 - Teacher's special notes: ${ctx.teacher_notes || '-'}
 
 ## Teaching Model: ${model.name}
@@ -75,6 +76,7 @@ Opening is fixed at 5 minutes. Distribute the remaining ~${duration - 5} minutes
 ## Output
 Respond ONLY with a single valid JSON object (no markdown, no commentary), with EXACTLY these keys:
 ${narrativeFields}
+${fallbackFields ? fallbackFields + '\n' : ''}${checkboxFields}
 - "main_activities": (array) one object PER syntax step above, in order: { "syntax_key": string (use the exact key), "syntax_label": string (use the exact label), "time_minutes": integer, "activity": string (concrete, numbered student & teacher activities for this step) }
 - "time_closing": (integer) closing duration in minutes
 
@@ -85,9 +87,16 @@ Guidance for specific fields:
 - "review": how the teacher reviews previous material.
 - "alpha_zone": short fun warm-up (ice breaking/brain gym) relevant to the topic.
 - "application": everyday phenomenon connecting the topic to real life.
-- "closing": reflection, conclusion, follow-up plan, and closing prayer.
+- "cdc": cross-disciplinary connections — other subjects genuinely related to this topic, with a short reason each.
+- "learning_media": concrete media/tools for THIS lesson (slides, LKPD, specific simulations/apps, props) consistent with the activities you design.
+- "resources": learning resources (official textbook style for this grade, credible sites/videos).
+- "closing": reflection, conclusion, follow-up plan, and closing prayer.${fallbackFields ? `
+- "learning_achievement": official-style Capaian Pembelajaran for this subject and fase — the teacher will verify it.
+- "learning_objectives": 1-3 measurable objectives (ABCD format: Audience, Behavior, Condition, Degree) aligned with the CP and topic.
+- "learning_material": the chapter/material name (short) that contains the topic.` : ''}
+- Checkbox arrays ("strategy", "method", "dimensions", "assessment"): choose only keys from the allowed lists, matching the teaching model and the activities you design (1-3 for strategy/method, 2-4 for dimensions, 2-3 for assessment).
 
-Write all narrative content in ${language}. Be concrete and practical (mention actual tools/media above where relevant), not generic.
+Write all narrative content in ${language}. Be concrete and practical, not generic.
 ${extra ? '\n## Additional instructions from the teacher\n' + extra : ''}`;
 }
 
@@ -96,10 +105,31 @@ ${extra ? '\n## Additional instructions from the teacher\n' + extra : ''}`;
 function lpValidateAiData(json, model) {
     if (!json || typeof json !== 'object') throw new Error('Output AI bukan objek JSON.');
 
+    // AI kadang mengembalikan array/objek utk field teks -> coerce ke string
+    const asText = v => {
+        if (typeof v === 'string') return v.trim();
+        if (Array.isArray(v)) return v.map(x => (typeof x === 'string' ? x : JSON.stringify(x))).join('\n').trim();
+        if (v && typeof v === 'object') return Object.values(v).filter(x => typeof x === 'string').join('\n').trim();
+        return '';
+    };
+
     const result = {};
     lpFieldsBySource('ai').filter(f => f.type === 'textarea').forEach(f => {
-        const v = json[f.id];
-        result[f.id] = (typeof v === 'string') ? v.trim() : '';
+        result[f.id] = asText(json[f.id]);
+    });
+
+    // Field aiFallback (CP/TP/materi yang dikosongkan guru): simpan jika AI mengembalikannya
+    LP_FIELD_REGISTRY.filter(f => f.aiFallback).forEach(f => {
+        const v = asText(json[f.id]);
+        if (v) result[f.id] = v;
+    });
+
+    // Checkbox yang disarankan AI: filter hanya key yang valid
+    lpFieldsBySource('ai').filter(f => f.type === 'checkbox-group').forEach(f => {
+        const grp = LP_CHECKBOX_GROUPS[f.group];
+        const validKeys = grp.options.map(o => o.key);
+        const v = Array.isArray(json[f.id]) ? json[f.id] : [];
+        result[f.id] = v.filter(k => validKeys.indexOf(k) !== -1);
     });
 
     const syntax = model.syntax || [];

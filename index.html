@@ -483,9 +483,16 @@
                 <!-- Modal Tambah Jadwal Satu Kali -->
                 <div id="modal-jadwal-onetime" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-                        <h3 class="font-black text-slate-800 text-lg flex items-center gap-2"><i data-lucide="calendar-plus" class="w-5 h-5 text-emerald-600"></i>Tambah Jadwal (Satu Kali)</h3>
+                        <h3 class="font-black text-slate-800 text-lg flex items-center gap-2"><i data-lucide="calendar-plus" class="w-5 h-5 text-emerald-600"></i>Tambah Jadwal</h3>
                         <p id="jot-tanggal-label" class="text-xs text-slate-400 font-semibold"></p>
                         <div class="space-y-3">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Pengulangan</label>
+                                <select id="jot-pengulangan" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-indigo-300">
+                                    <option value="sekali">Hanya tanggal ini saja</option>
+                                    <option value="mingguan">Berulang tiap minggu (hari & jam sama)</option>
+                                </select>
+                            </div>
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Nama Kegiatan / Mapel</label>
                                 <input type="text" id="jot-mapel" placeholder="Contoh: Piket, Rapat Guru, Les Tambahan..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:border-indigo-300">
@@ -1524,6 +1531,20 @@
                 <button onclick="tutupModalJadwal()" class="text-slate-400 hover:text-rose-600 p-2 rounded-xl"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <div class="p-5 space-y-4">
+                <!-- Pengulangan: berulang tiap minggu vs hanya tanggal tertentu -->
+                <div id="jadwal-pengulangan-wrap" class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Pengulangan</label>
+                        <select id="jadwal-pengulangan" onchange="toggleJadwalPengulangan()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                            <option value="mingguan">Berulang tiap minggu</option>
+                            <option value="sekali">Hanya tanggal tertentu</option>
+                        </select>
+                    </div>
+                    <div id="jadwal-tanggal-wrap" class="hidden">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Tanggal</label>
+                        <input type="date" id="jadwal-tanggal" onchange="sinkronHariDariTanggal()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    </div>
+                </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Hari</label>

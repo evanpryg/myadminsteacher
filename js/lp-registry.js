@@ -21,11 +21,10 @@
 // ============================================================
 
 const LP_SECTIONS = [
-    { id: 'identity',   label: 'Identitas',              icon: 'id-card' },
-    { id: 'curriculum', label: 'Kurikulum',              icon: 'book-open' },
-    { id: 'pedagogy',   label: 'Praktik Pedagogis',      icon: 'shapes' },
-    { id: 'resources',  label: 'Media & Sumber Belajar', icon: 'monitor-play' },
-    { id: 'ai_context', label: 'Konteks untuk AI',       icon: 'sparkles' }
+    { id: 'identity',   label: 'Identitas',         icon: 'id-card' },
+    { id: 'curriculum', label: 'Kurikulum',         icon: 'book-open' },
+    { id: 'pedagogy',   label: 'Praktik Pedagogis', icon: 'shapes' },
+    { id: 'ai_context', label: 'Konteks untuk AI',  icon: 'sparkles' }
 ];
 
 // Opsi grup checkbox. Key HARUS cocok dengan placeholder chk_<group>_<key>
@@ -97,22 +96,15 @@ const LP_FIELD_REGISTRY = [
     { id: 'meeting',        label: 'Pertemuan Ke-',       type: 'number', source: 'static', placeholder: 'meeting',        section: 'identity', default: 1, width: 'sm' },
 
     // ---------- STATIC: kurikulum ----------
-    { id: 'learning_material',    label: 'Materi Pelajaran',                 type: 'text',     source: 'static', placeholder: 'learning_material',    section: 'curriculum', required: true },
-    { id: 'learning_topic',       label: 'Topik Pembelajaran',               type: 'text',     source: 'static', placeholder: 'learning_topic',       section: 'curriculum', required: true },
-    { id: 'learning_achievement', label: 'Capaian Pembelajaran (CP)',        type: 'textarea', source: 'static', placeholder: 'learning_achievement', section: 'curriculum' },
-    { id: 'learning_objectives',  label: 'Tujuan Pembelajaran',              type: 'textarea', source: 'static', placeholder: 'learning_objectives',  section: 'curriculum' },
-    { id: 'cdc',                  label: 'Lintas Disiplin Ilmu',             type: 'textarea', source: 'static', placeholder: 'cdc',                  section: 'curriculum', rows: 2 },
+    // aiFallback: jika guru mengosongkan, AI yang mengisi (tetap bisa diedit di step review)
+    // bank     : field terhubung ke bank CP/TP (typeahead - ketik lalu pilih dari dropdown)
+    { id: 'learning_material',    label: 'Materi Pelajaran (opsional - AI mengisi jika kosong)', type: 'text',     source: 'static', placeholder: 'learning_material',    section: 'curriculum', aiFallback: true },
+    { id: 'learning_topic',       label: 'Topik Pembelajaran',                                    type: 'text',     source: 'static', placeholder: 'learning_topic',       section: 'curriculum', required: true },
+    { id: 'learning_achievement', label: 'Capaian Pembelajaran (CP)',                             type: 'textarea', source: 'static', placeholder: 'learning_achievement', section: 'curriculum', aiFallback: true, bank: 'CP' },
+    { id: 'learning_objectives',  label: 'Tujuan Pembelajaran (TP)',                              type: 'textarea', source: 'static', placeholder: 'learning_objectives',  section: 'curriculum', aiFallback: true, bank: 'TP' },
 
     // ---------- STATIC: pedagogi ----------
-    { id: 'teaching_model', label: 'Model Pembelajaran',             type: 'model-select',   source: 'static', placeholder: null, section: 'pedagogy', required: true },
-    { id: 'strategy',       label: 'Teaching Strategy',              type: 'checkbox-group', source: 'static', placeholder: null, section: 'pedagogy', group: 'strategy' },
-    { id: 'method',         label: 'Teaching Method',                type: 'checkbox-group', source: 'static', placeholder: null, section: 'pedagogy', group: 'method' },
-    { id: 'dimensions',     label: 'Dimensi Profil Lulusan',         type: 'checkbox-group', source: 'static', placeholder: null, section: 'pedagogy', group: 'dimensions' },
-    { id: 'assessment',     label: 'Formative Assessment',           type: 'checkbox-group', source: 'static', placeholder: null, section: 'pedagogy', group: 'assessment' },
-
-    // ---------- STATIC: media & sumber ----------
-    { id: 'learning_media', label: 'Media Pembelajaran', type: 'textarea', source: 'static', placeholder: 'learning_media', section: 'resources', rows: 2, hintAI: true },
-    { id: 'resources',      label: 'Sumber Belajar',     type: 'textarea', source: 'static', placeholder: 'resources',      section: 'resources', rows: 2, hintAI: true },
+    { id: 'teaching_model', label: 'Model Pembelajaran', type: 'model-select', source: 'static', placeholder: null, section: 'pedagogy', required: true },
 
     // ---------- CONTEXT: hanya untuk prompt AI ----------
     { id: 'language',              label: 'Bahasa Lesson Plan',       type: 'select',   source: 'context', placeholder: null, section: 'ai_context', options: ['Bahasa Indonesia', 'English'], default: 'English' },
@@ -125,13 +117,22 @@ const LP_FIELD_REGISTRY = [
     { id: 'partnerships',        label: 'Learning Partnerships',       type: 'textarea', source: 'ai', placeholder: 'partnerships' },
     { id: 'learning_environment',label: 'Learning Environment',        type: 'textarea', source: 'ai', placeholder: 'learning_environment' },
     { id: 'digital_utilization', label: 'Digital Utilization',         type: 'textarea', source: 'ai', placeholder: 'digital_utilization' },
+    { id: 'cdc',                 label: 'Lintas Disiplin Ilmu',        type: 'textarea', source: 'ai', placeholder: 'cdc' },
+    { id: 'learning_media',      label: 'Media Pembelajaran',          type: 'textarea', source: 'ai', placeholder: 'learning_media' },
+    { id: 'resources',           label: 'Sumber Belajar',              type: 'textarea', source: 'ai', placeholder: 'resources' },
     { id: 'islamic_value',       label: 'Islamic Value',               type: 'textarea', source: 'ai', placeholder: 'islamic_value' },
     { id: 'review',              label: 'Review',                      type: 'textarea', source: 'ai', placeholder: 'review' },
     { id: 'alpha_zone',          label: 'Alpha Zone',                  type: 'textarea', source: 'ai', placeholder: 'alpha_zone' },
     { id: 'application',         label: 'Application',                 type: 'textarea', source: 'ai', placeholder: 'application' },
     { id: 'main_activities',     label: 'Main Activities',             type: 'activities', source: 'ai', placeholder: 'main_activities' },
     { id: 'closing',             label: 'Closing',                     type: 'textarea', source: 'ai', placeholder: 'closing' },
-    { id: 'time_closing',        label: 'Durasi Closing (menit)',      type: 'number',   source: 'ai', placeholder: 'time_closing' }
+    { id: 'time_closing',        label: 'Durasi Closing (menit)',      type: 'number',   source: 'ai', placeholder: 'time_closing' },
+
+    // ---------- AI SUGGESTED (checkbox - disarankan AI, diedit guru di step review) ----------
+    { id: 'strategy',   label: 'Teaching Strategy',        type: 'checkbox-group', source: 'ai', placeholder: null, group: 'strategy' },
+    { id: 'method',     label: 'Teaching Method',          type: 'checkbox-group', source: 'ai', placeholder: null, group: 'method' },
+    { id: 'dimensions', label: 'Dimensi Profil Lulusan',   type: 'checkbox-group', source: 'ai', placeholder: null, group: 'dimensions' },
+    { id: 'assessment', label: 'Formative Assessment',     type: 'checkbox-group', source: 'ai', placeholder: null, group: 'assessment' }
 ];
 
 // ---------- helpers ----------

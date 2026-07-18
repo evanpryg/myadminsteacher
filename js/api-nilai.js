@@ -310,6 +310,14 @@ async function hapusJadwalOverride(tanggal, jadwalId) {
     return { success: true };
 }
 
+// Hapus jadwal satu-kali (override aksi 'tambah') berdasarkan id override
+async function hapusJadwalTambahan(tanggal, otId) {
+    let overrides = await getJadwalOverrides();
+    overrides = overrides.filter(o => !(o.tanggal === tanggal && o.id === otId && o.aksi === 'tambah'));
+    await setAppSetting('GS_JADWAL_OVERRIDES', JSON.stringify(overrides));
+    return { success: true };
+}
+
 // ── DASHBOARD DATA (combines multiple reads) ────────────────
 async function getDashboardData() {
     const settings = await getMultipleSettings([
@@ -345,19 +353,33 @@ async function getDashboardData() {
         rataRataNilai = Math.round(total / nilaiValid.length);
     }
 
-    // Agenda hari ini
+    // Agenda hari ini (terapkan override: skip per-tanggal & jadwal satu-kali)
     const hariList = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     const now = new Date();
     const hariIni = hariList[now.getDay()];
-    const agenda = (jadwal || []).filter(j => j.hari === hariIni).map(j => {
+    const tglIni = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    let overrides = [];
+    try { overrides = JSON.parse(settings.GS_JADWAL_OVERRIDES || '[]'); } catch (e) { overrides = []; }
+    const skipHariIni = overrides.filter(o => o.tanggal === tglIni && o.aksi === 'skip').map(o => o.jadwalId);
+    const tambahanHariIni = overrides.filter(o => o.tanggal === tglIni && o.aksi === 'tambah');
+
+    const agenda = (jadwal || []).filter(j => j.hari === hariIni && !skipHariIni.includes(j.id)).map(j => {
         let jam_mulai = '', jam_selesai = '';
-        if (j.jam_ke) { const p = j.jam_ke.split('-'); jam_mulai = (p[0]||'').trim(); jam_selesai = (p[1]||'').trim(); }
+        if (j.jam_ke) { const p = j.jam_ke.split(/[-\s]+/); jam_mulai = (p[0]||'').trim(); jam_selesai = (p[1]||'').trim(); }
         return {
             jamMulai: jam_mulai, jamSelesai: jam_selesai,
             kelas: j.kelas || '', mapel: j.mata_pelajaran || '',
             ruang: j.ruangan || '', kategori: j.kategori || 'Normal'
         };
     });
+    tambahanHariIni.forEach(o => {
+        agenda.push({
+            jamMulai: o.jam_mulai || '', jamSelesai: o.jam_selesai || '',
+            kelas: o.kelas || '', mapel: o.mata_pelajaran || '',
+            ruang: o.ruang || '', kategori: o.kategori || 'Normal'
+        });
+    });
+    agenda.sort((a, b) => (a.jamMulai || '').localeCompare(b.jamMulai || ''));
 
     // Todo & Quick Links
     let todos = [];

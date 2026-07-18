@@ -13,6 +13,7 @@
 
 1. Jalankan `supabase-migration.sql` di Supabase SQL Editor.
 2. Jalankan `supabase-migration-lessonplan.sql` (fitur Lesson Plan Generator).
+3. Jalankan `supabase-migration-cptp.sql` (bank CP & TP untuk lesson plan).
 
 ## Struktur File
 
@@ -75,6 +76,23 @@ Alur: **Form → Generate AI (JSON) → Review/Edit oleh guru → Simpan → Dow
    row baru + set `is_active`). Jika hanya mengubah tata letak/teks statis, selesai —
    tanpa menyentuh kode. Jika menambah placeholder baru: tambah field di
    `js/lp-registry.js` + mapping di kolom `manifest`.
+
+### Input minimal di generator
+
+Guru cukup mengisi: mapel, kelas, tanggal, topik, dan model pembelajaran.
+Sisanya (materi, CP, TP, lintas disiplin, media, sumber, strategi/metode/
+dimensi/asesmen) diisi atau disarankan AI dan tetap bisa diedit di step review.
+CP & TP juga bisa dipilih dari **bank CP/TP** (tabel `lp_cp_tp`) lewat
+dropdown ketik-cari; entri baru otomatis tersimpan ke bank saat generate.
+
+### Jadwal: sekali vs berulang
+
+- Tambah jadwal (Pengaturan → Jadwal, atau tombol **+** di halaman Jadwal
+  Mengajar per hari): pilih **berulang tiap minggu** (tabel `jadwal_mengajar`)
+  atau **hanya tanggal tertentu** (override `GS_JADWAL_OVERRIDES`).
+- Hapus dari halaman Jadwal Mengajar: **hapus hari ini saja** (skip per
+  tanggal, bisa di-undo) atau **hapus seterusnya** (seri dihapus dari semua
+  minggu). Agenda dashboard ikut menerapkan override ini.
 
 ## Catatan
 - SUPABASE_KEY yang dipakai adalah anon key (public), aman untuk client-side

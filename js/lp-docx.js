@@ -31,7 +31,12 @@ function lpFlattenData(formData, aiData, manifest, teachingModelSlug) {
     const logicalValues = {};
     LP_FIELD_REGISTRY.forEach(f => {
         if (f.source === 'static' && f.placeholder) {
-            logicalValues[f.placeholder] = ((formData || {})[f.section] || {})[f.id];
+            let v = ((formData || {})[f.section] || {})[f.id];
+            // aiFallback: form kosong -> pakai isian AI (yang sudah direview guru)
+            if (f.aiFallback && (v === undefined || v === null || String(v).trim() === '')) {
+                v = (aiData || {})[f.id];
+            }
+            logicalValues[f.placeholder] = v;
         } else if (f.source === 'ai' && f.placeholder) {
             logicalValues[f.placeholder] = (aiData || {})[f.id];
         }
@@ -101,10 +106,11 @@ function lpRenderDocx(templateBuffer, manifest, data, outputType) {
     });
     doc.render(data);
     if (outputType === 'base64') {
-        return doc.getZip().generate({ type: 'base64' });
+        return doc.getZip().generate({ type: 'base64', compression: 'DEFLATE' });
     }
     return doc.getZip().generate({
         type: 'blob',
+        compression: 'DEFLATE',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     });
 }

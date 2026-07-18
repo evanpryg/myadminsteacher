@@ -143,7 +143,15 @@ async function lpRenderForm(prefill) {
             const listAttr = f.datalist ? ` list="lp-dl-${f.datalist}"` : '';
             input = `<input type="${f.type}" id="${id}" value="${lpEscape(String(val))}"${listAttr} class="${inputCls}">`;
         } else if (f.type === 'textarea') {
-            input = `<textarea id="${id}" rows="${f.rows || 3}" class="${inputCls}">${lpEscape(String(val))}</textarea>`;
+            if (f.bank) {
+                // Typeahead bank CP/TP: ketik utk memfilter, pilih dari dropdown
+                input = `<div class="relative">
+                    <textarea id="${id}" rows="${f.rows || 3}" data-bank="${f.bank}" autocomplete="off" placeholder="Ketik untuk mencari di bank ${f.bank}, atau tulis baru (otomatis tersimpan ke bank). Kosongkan jika ingin diisi AI." class="${inputCls}">${lpEscape(String(val))}</textarea>
+                    <div id="lp-bank-dd-${f.id}" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-40 max-h-64 overflow-y-auto"></div>
+                </div>`;
+            } else {
+                input = `<textarea id="${id}" rows="${f.rows || 3}" class="${inputCls}">${lpEscape(String(val))}</textarea>`;
+            }
         } else if (f.type === 'select') {
             input = `<select id="${id}" class="${inputCls} bg-white">` +
                 (f.options || []).map(o => `<option value="${lpEscape(o)}"${o === val ? ' selected' : ''}>${lpEscape(o)}</option>`).join('') +
@@ -190,7 +198,73 @@ async function lpRenderForm(prefill) {
         modelEl.addEventListener('change', lpTampilkanSyntaxPreview);
         lpTampilkanSyntaxPreview();
     }
+
+    // Typeahead bank CP/TP
+    LP_FIELD_REGISTRY.filter(f => f.bank).forEach(f => lpInitBankTypeahead(f));
     lucide.createIcons();
+}
+
+// ============================================================
+// BANK CP/TP - TYPEAHEAD (semi text dropdown)
+// Ketik di textarea -> dropdown menampilkan entri bank yang cocok.
+// Klik item utk memakai; ikon x utk menghapus dari bank.
+// ============================================================
+function lpInitBankTypeahead(field) {
+    const ta = document.getElementById(`lp-f-${field.section}-${field.id}`);
+    const dd = document.getElementById(`lp-bank-dd-${field.id}`);
+    if (!ta || !dd) return;
+
+    const render = async () => {
+        let items = [];
+        try { items = await lpGetBankItems(field.bank); } catch (e) { items = []; }
+        const subject = ((document.getElementById('lp-f-identity-subject') || {}).value || '').trim().toLowerCase();
+        const q = ta.value.trim().toLowerCase();
+
+        // Urutkan: mapel yang sama dulu; filter berdasarkan teks yang diketik
+        let filtered = items.filter(i => !q || i.content.toLowerCase().includes(q) || (i.subject || '').toLowerCase().includes(q));
+        filtered.sort((a, b) => {
+            const am = (a.subject || '').toLowerCase() === subject ? 0 : 1;
+            const bm = (b.subject || '').toLowerCase() === subject ? 0 : 1;
+            return am - bm;
+        });
+        filtered = filtered.slice(0, 8);
+
+        if (filtered.length === 0) { dd.classList.add('hidden'); return; }
+        dd.innerHTML = filtered.map(i => `
+            <div class="flex items-start gap-2 px-3 py-2.5 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 group/bi" data-bank-id="${i.id}">
+                <div class="flex-1 min-w-0">
+                    <p class="text-[10px] font-black text-indigo-500 uppercase">${lpEscape(i.subject || 'Umum')}${i.phase ? ' · Fase ' + lpEscape(i.phase) : ''}</p>
+                    <p class="text-xs text-slate-600 font-medium leading-snug">${lpEscape(i.content.length > 160 ? i.content.slice(0, 160) + '…' : i.content)}</p>
+                </div>
+                <button data-bank-del="${i.id}" title="Hapus dari bank" class="shrink-0 p-1 rounded-md text-slate-300 hover:text-rose-500 hover:bg-rose-50 opacity-0 group-hover/bi:opacity-100"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+            </div>`).join('');
+        dd.classList.remove('hidden');
+        lucide.createIcons();
+
+        dd.querySelectorAll('[data-bank-id]').forEach(row => {
+            row.addEventListener('mousedown', async (ev) => {
+                const delBtn = ev.target.closest('[data-bank-del]');
+                ev.preventDefault();
+                if (delBtn) {
+                    ev.stopPropagation();
+                    const id = parseInt(delBtn.getAttribute('data-bank-del'), 10);
+                    if (confirm('Hapus entri ini dari bank ' + field.bank + '?')) {
+                        await lpHapusBankItem(field.bank, id);
+                        render();
+                    }
+                    return;
+                }
+                const item = (await lpGetBankItems(field.bank)).find(x => x.id === parseInt(row.getAttribute('data-bank-id'), 10));
+                if (item) { ta.value = item.content; }
+                dd.classList.add('hidden');
+            });
+        });
+    };
+
+    let t = null;
+    ta.addEventListener('input', () => { clearTimeout(t); t = setTimeout(render, 200); });
+    ta.addEventListener('focus', render);
+    ta.addEventListener('blur', () => setTimeout(() => dd.classList.add('hidden'), 200));
 }
 
 function lpTampilkanSyntaxPreview() {
@@ -244,6 +318,16 @@ async function generateLessonPlanAIStart() {
     _lpState.modelSlug = modelSlug;
     lpGoToStep(2);
 
+    // Simpan CP/TP yang diisi guru ke bank (tidak menggagalkan generate jika error)
+    try {
+        const subject = (formData.identity || {}).subject || '';
+        const phase = (formData.identity || {}).phase || '';
+        for (const f of LP_FIELD_REGISTRY.filter(x => x.bank)) {
+            const val = ((formData[f.section] || {})[f.id] || '').toString();
+            if (val.trim()) await lpSimpanKeBank(f.bank, subject, phase, val);
+        }
+    } catch (e) { console.warn('Gagal menyimpan ke bank CP/TP:', e); }
+
     try {
         _lpState.aiData = await lpGenerateAiData(formData, model);
         lpRenderEditor(_lpState.aiData);
@@ -287,11 +371,32 @@ function lpRenderEditor(aiData) {
                 <input type="number" id="lp-e-${f.id}" value="${aiData[f.id] || 10}" min="1" class="w-24 border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-bold">
             </div>`;
         }
+        if (f.type === 'checkbox-group') {
+            const grp = LP_CHECKBOX_GROUPS[f.group];
+            const selected = Array.isArray(aiData[f.id]) ? aiData[f.id] : [];
+            return `<div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-2">${lpEscape(f.label)} <span class="text-indigo-400 normal-case font-semibold">(saran AI — sesuaikan bila perlu)</span></label>
+                <div class="flex flex-wrap gap-x-4 gap-y-2">` +
+                grp.options.map(o =>
+                    `<label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer">
+                        <input type="checkbox" name="lp-e-grp-${f.id}" value="${o.key}"${selected.indexOf(o.key) !== -1 ? ' checked' : ''} class="w-4 h-4 rounded text-indigo-600">${lpEscape(o.label)}
+                    </label>`).join('') +
+                `</div></div>`;
+        }
         return `<div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
             <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">${lpEscape(f.label)}</label>
             <textarea id="lp-e-${f.id}" rows="3" class="${inputCls} text-xs">${lpEscape(aiData[f.id] || '')}</textarea>
         </div>`;
     };
+
+    // Kartu utk field statis yang dikosongkan guru & diisi AI (CP/TP/Materi)
+    const fallbackCards = LP_FIELD_REGISTRY
+        .filter(f => f.aiFallback && (aiData[f.id] || '').toString().trim()
+            && !(((_lpState.formData || {})[f.section] || {})[f.id] || '').toString().trim())
+        .map(f => `<div class="bg-white border border-indigo-200 rounded-2xl p-4 shadow-sm">
+            <label class="text-[10px] font-black text-indigo-500 uppercase tracking-wider block mb-1">${lpEscape(f.label.replace(/ \(opsional[^)]*\)/i, ''))} <span class="bg-indigo-50 text-indigo-600 normal-case font-bold px-1.5 py-0.5 rounded-md">Diisi AI</span></label>
+            <textarea id="lp-e-${f.id}" rows="${f.type === 'text' ? 2 : 3}" class="${inputCls} text-xs">${lpEscape(aiData[f.id])}</textarea>
+        </div>`).join('');
 
     container.innerHTML =
         `<div class="flex justify-end">
@@ -299,6 +404,7 @@ function lpRenderEditor(aiData) {
                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Generate Ulang AI
             </button>
         </div>` +
+        fallbackCards +
         lpFieldsBySource('ai').map(cardHtml).join('');
     lucide.createIcons();
 }
@@ -313,12 +419,20 @@ function lpCollectAiData() {
                 time_minutes: parseInt((document.getElementById(`lp-e-act-time-${i}`) || {}).value, 10) || a.time_minutes,
                 activity: ((document.getElementById(`lp-e-act-${i}`) || {}).value || '').trim()
             }));
+        } else if (f.type === 'checkbox-group') {
+            aiData[f.id] = Array.from(document.querySelectorAll(`input[name="lp-e-grp-${f.id}"]:checked`)).map(cb => cb.value);
         } else {
             const el = document.getElementById(`lp-e-${f.id}`);
             aiData[f.id] = f.type === 'number'
                 ? (parseInt(el && el.value, 10) || 10)
                 : ((el && el.value) || '').trim();
         }
+    });
+    // Field aiFallback yang tampil sebagai kartu "Diisi AI"
+    LP_FIELD_REGISTRY.filter(f => f.aiFallback).forEach(f => {
+        const el = document.getElementById(`lp-e-${f.id}`);
+        if (el) aiData[f.id] = el.value.trim();
+        else if (_lpState.aiData && _lpState.aiData[f.id]) aiData[f.id] = _lpState.aiData[f.id];
     });
     return aiData;
 }
@@ -343,6 +457,14 @@ async function lpRegenerateAI() {
 async function simpanLessonPlanSekarang(danDownload) {
     const aiData = lpCollectAiData();
     _lpState.aiData = aiData;
+
+    // Checkbox saran AI (sudah direview guru) -> masuk ke form_data.pedagogy
+    // agar flatten DOCX & fitur duplikat tetap bekerja tanpa perubahan.
+    _lpState.formData.pedagogy = _lpState.formData.pedagogy || {};
+    lpFieldsBySource('ai').filter(f => f.type === 'checkbox-group').forEach(f => {
+        if (Array.isArray(aiData[f.id])) _lpState.formData.pedagogy[f.id] = aiData[f.id];
+    });
+
     const isFinal = document.getElementById('lp-save-status');
     const idn = _lpState.formData.identity || {};
     const cur = _lpState.formData.curriculum || {};
