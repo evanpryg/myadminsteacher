@@ -1431,7 +1431,6 @@ function _renderJadwalView() {
         const top = st !== null ? posy(st) : 0;
         const h = (st !== null && en !== null && en > st) ? Math.max((en - st) * PPM, 40) : 44;
         const label = _esc((e.kelas ? e.kelas + ' - ' : '') + (e.mata_pelajaran || e.mapel || ''));
-        const c = d.color;
         if (jenis === 'skip') {
             return `<div class="absolute left-1 right-1 rounded-lg border border-dashed border-slate-300 bg-slate-50/90 px-1.5 py-1 overflow-hidden group/ev" style="top:${top}px;height:${Math.max(h,34)}px">
                 <p class="text-[9px] font-bold text-slate-400 line-through leading-tight truncate">${e.jam_mulai || '?'}–${e.jam_selesai || '?'} ${label}</p>
@@ -1439,8 +1438,16 @@ function _renderJadwalView() {
             </div>`;
         }
         const isSekali = jenis === 'sekali';
-        const bg = isSekali ? 'bg-emerald-100/90 border-emerald-300' : `bg-${c}-100/90 border-${c}-300`;
-        const txt = isSekali ? 'text-emerald-800' : `text-${c}-800`;
+        // Warna berdasarkan KATEGORI jadwal (bukan hari):
+        // Normal = indigo, Intensif = amber, Kegiatan = slate
+        const kat = e.kategori || 'Normal';
+        const katPalette = {
+            Normal:   ['bg-indigo-100/90 border-indigo-300', 'text-indigo-800'],
+            Intensif: ['bg-amber-100/90 border-amber-300', 'text-amber-800'],
+            Kegiatan: ['bg-slate-200/90 border-slate-300', 'text-slate-700']
+        };
+        const pal = katPalette[kat] || katPalette.Normal;
+        const bg = pal[0], txt = pal[1];
         const btns = isSekali
             ? `<button onclick="_hapusJadwalTambahanUI('${d.tglIso}','${_esc(e.id)}','${label}')" title="Hapus jadwal satu kali ini" class="p-0.5 rounded bg-white/90 text-slate-400 hover:text-rose-600 border border-slate-200"><i data-lucide="trash-2" class="w-3 h-3"></i></button>`
             : `<button onclick="_skipJadwal(${e.id},'${d.tglIso}','${label}')" title="Hapus hari ini saja" class="p-0.5 rounded bg-white/90 text-slate-400 hover:text-amber-600 border border-slate-200"><i data-lucide="calendar-x" class="w-3 h-3"></i></button>
@@ -1468,7 +1475,15 @@ function _renderJadwalView() {
         ? `<div class="absolute left-0 right-0 border-t-2 border-rose-400 z-10 pointer-events-none" style="top:${posy(nowMin)}px"><span class="absolute -top-1 -left-0.5 w-2 h-2 rounded-full bg-rose-400"></span></div>`
         : '';
 
-    let html = `<div class="min-w-[840px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    // Legenda warna kategori
+    const legenda = `<div class="flex items-center gap-3 flex-wrap mb-2 px-1">
+        <span class="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><span class="w-3 h-3 rounded bg-indigo-100 border border-indigo-300"></span>Jam Normal</span>
+        <span class="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><span class="w-3 h-3 rounded bg-amber-100 border border-amber-300"></span>Intensif</span>
+        <span class="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><span class="w-3 h-3 rounded bg-slate-200 border border-slate-300"></span>Kegiatan</span>
+        <span class="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><span class="text-[8px] font-black bg-emerald-500 text-white px-1 rounded uppercase">1x</span>Jadwal sekali</span>
+    </div>`;
+
+    let html = legenda + `<div class="min-w-[840px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="grid" style="grid-template-columns:46px repeat(6,minmax(126px,1fr));">
             <div class="border-b border-slate-100 bg-slate-50"></div>`;
     days.forEach(d => {
@@ -1562,7 +1577,7 @@ function _renderQuickLinksFullPage() {
                     return `<div class="group relative flex items-center gap-3 p-4 rounded-2xl border ${cls} hover:shadow-md transition-all">
                         <i data-lucide="${_esc(l.icon || 'link')}" class="w-5 h-5 shrink-0"></i>
                         <div class="flex-1 min-w-0">
-                            <a href="${_esc(l.url)}" target="_blank" class="font-bold text-sm block truncate hover:underline">${_esc(l.label)}</a>
+                            <a href="${_esc(l.url)}" data-ql-track="${_esc(l.url)}" target="_blank" class="font-bold text-sm block truncate hover:underline">${_esc(l.label)}</a>
                             <p class="text-[10px] opacity-60 truncate">${_esc(l.url)}</p>
                         </div>
                         <div class="absolute top-2 right-2 hidden group-hover:flex items-center gap-1">

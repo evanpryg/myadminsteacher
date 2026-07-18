@@ -334,6 +334,26 @@ async function hapusJadwalTambahan(tanggal, otId) {
     return { success: true };
 }
 
+// ── QUICK LINKS: lacak frekuensi akses ──────────────────────
+// Dashboard menampilkan 4 link yang paling sering diklik.
+async function catatKlikQL(url) {
+    try {
+        const raw = await getAppSetting('GS_QUICK_LINKS', '{}');
+        const data = JSON.parse(raw || '{}');
+        const links = Array.isArray(data) ? data : (data.links || []);
+        const link = links.find(l => l.url === url);
+        if (!link) return;
+        link.hits = (link.hits || 0) + 1;
+        await setAppSetting('GS_QUICK_LINKS', JSON.stringify(data));
+    } catch (e) { /* pelacakan tidak boleh mengganggu navigasi */ }
+}
+
+// Delegasi klik utk semua elemen ber-atribut data-ql-track (dashboard & halaman quick links)
+document.addEventListener('click', function (e) {
+    const a = e.target.closest && e.target.closest('[data-ql-track]');
+    if (a) catatKlikQL(a.getAttribute('data-ql-track'));
+});
+
 // ── KALENDER PERTEMUAN (sinkron pertemuan <-> tanggal) ──────
 // Diturunkan dari jadwal mengajar + override (skip/tambah/start/end)
 // sejak tanggal mulai semester. Pertemuan ke-N sebuah kelas =

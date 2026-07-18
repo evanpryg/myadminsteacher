@@ -215,10 +215,12 @@ function _buildQuickLinks(links) {
     if (Array.isArray(links)) linkArray = links;
     else if (links && links.links) linkArray = links.links;
     if (!linkArray || linkArray.length === 0) return '';
+    // Tampilkan 4 link yang paling sering diakses (hits); sisanya lewat menu Quick Links
+    const top4 = linkArray.slice().sort((a, b) => (b.hits || 0) - (a.hits || 0)).slice(0, 4);
     const colorMap = { emerald: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700', amber: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700', sky: 'bg-sky-50 hover:bg-sky-100 border-sky-200 text-sky-700', indigo: 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700', rose: 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700', violet: 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700' };
     return `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="p-4 border-b border-slate-100 flex items-center justify-between"><div class="flex items-center gap-3"><div class="bg-slate-700 p-2 rounded-xl"><i data-lucide="link" class="w-4 h-4 text-white"></i></div><h3 class="font-bold text-slate-800 text-sm">Quick Links</h3></div><button onclick="pindahHalaman('quicklinks')" class="text-xs font-bold text-indigo-600">Kelola →</button></div>
-        <div class="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">${linkArray.slice(0, 10).map(l => `<a href="${_esc(l.url)}" target="_blank" class="flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${colorMap[l.color] || colorMap.indigo}"><i data-lucide="${l.icon || 'link'}" class="w-4 h-4 shrink-0"></i><span class="flex-1 truncate text-xs">${_esc(l.label)}</span></a>`).join('')}</div></div>`;
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between"><div class="flex items-center gap-3"><div class="bg-slate-700 p-2 rounded-xl"><i data-lucide="link" class="w-4 h-4 text-white"></i></div><div><h3 class="font-bold text-slate-800 text-sm">Quick Links</h3><p class="text-[10px] text-slate-400">4 paling sering diakses</p></div></div><button onclick="pindahHalaman('quicklinks')" class="text-xs font-bold text-indigo-600">Lihat Semua (${linkArray.length}) →</button></div>
+        <div class="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">${top4.map(l => `<a href="${_esc(l.url)}" data-ql-track="${_esc(l.url)}" target="_blank" class="flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${colorMap[l.color] || colorMap.indigo}"><i data-lucide="${l.icon || 'link'}" class="w-4 h-4 shrink-0"></i><span class="flex-1 truncate text-xs">${_esc(l.label)}</span></a>`).join('')}</div></div>`;
 }
 
 // ── Siswa Perlu Perhatian ────────────────────────────────────
