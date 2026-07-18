@@ -100,6 +100,22 @@ entri baru yang ditulis langsung di generator otomatis tersimpan ke bank.
   tersimpan untuk rekap). Hard delete permanen hanya ada di Pengaturan →
   Jadwal. Agenda dashboard & modal "Jadwal Minggu Depan" ikut menerapkan
   semua override ini.
+- Halaman Jadwal Mengajar berupa **timeline kalender ber-jam** (sumbu waktu
+  di kiri, event diposisikan & ditinggikan sesuai jam) sehingga jeda kosong
+  terlihat; di layar sempit bisa digeser horizontal.
+
+### Kalender Pertemuan (sinkron pertemuan ↔ tanggal)
+
+Nomor pertemuan diturunkan otomatis dari jadwal: pertemuan ke-N sebuah
+kelas = kemunculan terjadwal ke-N sejak **Tanggal Mulai Semester**
+(Pengaturan → Semester). Dipakai lintas fitur agar bebas human error:
+
+- **Presensi**: dropdown TM menampilkan tanggalnya ("Pertemuan 3 — 22/07")
+  dan field tanggal terisi otomatis (tetap bisa diubah manual).
+- **Lesson plan**: pilih kelas + pertemuan → tanggal terisi otomatis
+  (dan sebaliknya, ganti tanggal → nomor pertemuan menyesuaikan).
+  Duplikat massal memakai tanggal pertemuan yang sama di tiap kelas tujuan.
+- **Keaktifan**: badge "Pertemuan ke-N sesuai jadwal" di bawah tanggal.
 
 ## Catatan
 - SUPABASE_KEY yang dipakai adalah anon key (public), aman untuk client-side

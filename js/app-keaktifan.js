@@ -114,6 +114,17 @@ async function muatSiswaKeaktifan() {
     adaPerubahanKeaktifan = false;
     updateStatusSimpan();
 
+    // Badge pertemuan ke-N (sinkron dgn kalender jadwal, non-blocking)
+    (async () => {
+        const hint = document.getElementById('hint-pertemuan-keaktifan');
+        if (!hint) return;
+        try {
+            const kal = await getKalenderPertemuan(kelas);
+            const item = kal.find(k => k.tanggal === tanggal);
+            hint.textContent = item ? ('Pertemuan ke-' + item.pertemuan + ' sesuai jadwal') : (kal.length ? 'Tanggal ini di luar kalender jadwal kelas' : '');
+        } catch (e) { hint.textContent = ''; }
+    })();
+
     renderPesanKosongInput('<span class="animate-pulse text-indigo-500">Memuat daftar siswa...</span>');
 
     try {

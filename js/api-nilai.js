@@ -334,6 +334,57 @@ async function hapusJadwalTambahan(tanggal, otId) {
     return { success: true };
 }
 
+// ── KALENDER PERTEMUAN (sinkron pertemuan <-> tanggal) ──────
+// Diturunkan dari jadwal mengajar + override (skip/tambah/start/end)
+// sejak tanggal mulai semester. Pertemuan ke-N sebuah kelas =
+// kemunculan terjadwal ke-N. Dipakai presensi, keaktifan, lesson plan
+// agar nomor pertemuan & tanggal konsisten tanpa isian manual.
+async function getKalenderPertemuan(kelas, horizonHari) {
+    if (!kelas) return [];
+    const [jadwal, overrides, settings] = await Promise.all([
+        getDaftarJadwal(), getJadwalOverrides(),
+        getMultipleSettings(['GS_SEMESTER_MULAI', 'GS_SEMESTER', 'GS_TAHUN_AJARAN'])
+    ]);
+
+    // Tanggal mulai semester: dari pengaturan; fallback heuristik TA aktif
+    let mulai = settings.GS_SEMESTER_MULAI;
+    if (!mulai) {
+        const ta = (settings.GS_TAHUN_AJARAN || '').split('/');
+        const ganjil = (settings.GS_SEMESTER || 'Ganjil') === 'Ganjil';
+        const y = parseInt(ganjil ? ta[0] : ta[1], 10) || new Date().getFullYear();
+        mulai = ganjil ? (y + '-07-01') : (y + '-01-02');
+    }
+
+    const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const rows = (jadwal || []).filter(j => j.kelas === kelas && (j.kategori || 'Normal') !== 'Kegiatan');
+
+    const akhir = new Date();
+    akhir.setDate(akhir.getDate() + (horizonHari || 70));
+    const d = new Date(mulai + 'T00:00:00');
+    if (isNaN(d.getTime())) return [];
+
+    const items = [];
+    while (d <= akhir && items.length < 120) {
+        const tglIso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        const hari = HARI[d.getDay()];
+        const skipIds = overrides.filter(o => o.tanggal === tglIso && o.aksi === 'skip').map(o => o.jadwalId);
+        const hariIni = [];
+        rows.forEach(j => {
+            if (j.hari === hari && !skipIds.includes(j.id) && jadwalSeriesAktif(j.id, tglIso, overrides)) {
+                hariIni.push({ tanggal: tglIso, hari, jam_mulai: j.jam_mulai || '', jam_selesai: j.jam_selesai || '', mapel: j.mata_pelajaran || '', sekali: false });
+            }
+        });
+        overrides.filter(o => o.tanggal === tglIso && o.aksi === 'tambah' && o.kelas === kelas).forEach(o => {
+            hariIni.push({ tanggal: tglIso, hari, jam_mulai: o.jam_mulai || '', jam_selesai: o.jam_selesai || '', mapel: o.mata_pelajaran || '', sekali: true });
+        });
+        hariIni.sort((a, b) => (a.jam_mulai || '').localeCompare(b.jam_mulai || ''));
+        items.push(...hariIni);
+        d.setDate(d.getDate() + 1);
+    }
+    items.forEach((it, i) => { it.pertemuan = i + 1; });
+    return items;
+}
+
 // ── DASHBOARD DATA (combines multiple reads) ────────────────
 async function getDashboardData() {
     const settings = await getMultipleSettings([

@@ -207,7 +207,73 @@ async function lpRenderForm(prefill) {
 
     // Typeahead bank CP/TP
     LP_FIELD_REGISTRY.filter(f => f.bank).forEach(f => lpInitBankTypeahead(f));
+
+    // Sinkron kelas <-> pertemuan <-> tanggal (kalender dari jadwal)
+    lpSinkronPertemuanSetup();
     lucide.createIcons();
+}
+
+// ============================================================
+// SINKRON PERTEMUAN <-> TANGGAL (mengurangi human error)
+// Pilih kelas -> pertemuan N otomatis mengisi tanggal sesuai
+// kalender jadwal; ubah tanggal -> nomor pertemuan menyesuaikan.
+// ============================================================
+const _lpKalenderCache = {};
+
+async function lpGetKalender(kelas) {
+    if (!kelas) return [];
+    if (!_lpKalenderCache[kelas]) {
+        try { _lpKalenderCache[kelas] = await getKalenderPertemuan(kelas); }
+        catch (e) { _lpKalenderCache[kelas] = []; }
+    }
+    return _lpKalenderCache[kelas];
+}
+
+function lpSinkronPertemuanSetup() {
+    const kelasEl = document.getElementById('lp-f-identity-grade');
+    const meetEl = document.getElementById('lp-f-identity-meeting');
+    const dateEl = document.getElementById('lp-f-identity-date');
+    if (!kelasEl || !meetEl || !dateEl) return;
+
+    // Elemen hint di bawah field pertemuan
+    let hint = document.getElementById('lp-sync-pertemuan');
+    if (!hint) {
+        hint = document.createElement('p');
+        hint.id = 'lp-sync-pertemuan';
+        hint.className = 'text-[10px] font-semibold text-indigo-500 mt-1';
+        meetEl.parentElement.appendChild(hint);
+    }
+
+    const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+    const fmt = iso => { const d = new Date(iso + 'T00:00:00'); return HARI[d.getDay()] + ', ' + d.getDate() + '/' + (d.getMonth()+1); };
+
+    const dariPertemuan = async () => {
+        const kal = await lpGetKalender(kelasEl.value.trim());
+        const n = parseInt(meetEl.value, 10);
+        const item = kal[n - 1];
+        if (item) {
+            dateEl.value = item.tanggal;
+            hint.textContent = 'Tanggal otomatis: ' + fmt(item.tanggal) + ' (Pertemuan ' + n + ' sesuai jadwal)';
+        } else {
+            hint.textContent = kal.length ? 'Pertemuan di luar kalender jadwal — tanggal manual' : '';
+        }
+    };
+    const dariTanggal = async () => {
+        const kal = await lpGetKalender(kelasEl.value.trim());
+        const item = kal.find(k => k.tanggal === dateEl.value);
+        if (item) {
+            meetEl.value = item.pertemuan;
+            hint.textContent = 'Tanggal ini = Pertemuan ke-' + item.pertemuan + ' sesuai jadwal';
+        } else if (kal.length) {
+            hint.textContent = 'Tanggal di luar kalender jadwal kelas ini';
+        }
+    };
+
+    let t = null;
+    kelasEl.addEventListener('input', () => { clearTimeout(t); t = setTimeout(dariPertemuan, 500); });
+    meetEl.addEventListener('input', dariPertemuan);
+    dateEl.addEventListener('change', dariTanggal);
+    if (kelasEl.value.trim()) dariPertemuan();
 }
 
 // ============================================================
@@ -619,18 +685,41 @@ async function lpBukaDuplikat(id) {
     document.getElementById('dup-dl-kelas').innerHTML =
         kelasList.map(k => `<option value="${lpEscape(k)}">`).join('');
 
-    // Prefill: satu baris per kelas mengajar (selain kelas sumber),
-    // tanggal & pertemuan mengikuti sumber sebagai titik awal.
+    // Prefill: satu baris per kelas mengajar (selain kelas sumber).
+    // Pertemuan mengikuti sumber; TANGGAL otomatis = tanggal pertemuan
+    // tsb di kalender jadwal MASING-MASING kelas (sinkron, anti human error).
     const targets = kelasList.filter(k => k !== idn.grade);
+    const meeting = idn.meeting || 1;
     document.getElementById('dup-rows').innerHTML = '';
     if (targets.length > 0) {
-        targets.forEach(k => lpTambahBarisDuplikat({
-            kelas: k, tanggal: idn.date || '', pertemuan: idn.meeting || 1,
-            karakteristik: ctx.class_characteristics || LP_KARAKTERISTIK_OPTS[0]
-        }));
+        for (const k of targets) {
+            const kal = await lpGetKalender(k);
+            const item = kal[meeting - 1];
+            lpTambahBarisDuplikat({
+                kelas: k, tanggal: (item && item.tanggal) || idn.date || '', pertemuan: meeting,
+                karakteristik: ctx.class_characteristics || LP_KARAKTERISTIK_OPTS[0]
+            });
+        }
     } else {
-        lpTambahBarisDuplikat({ tanggal: idn.date || '', pertemuan: idn.meeting || 1,
+        lpTambahBarisDuplikat({ tanggal: idn.date || '', pertemuan: meeting,
             karakteristik: ctx.class_characteristics || LP_KARAKTERISTIK_OPTS[0] });
+    }
+
+    // Ubah kelas/pertemuan di baris -> tanggal ikut kalender kelas tsb
+    const rowsEl = document.getElementById('dup-rows');
+    if (rowsEl && !rowsEl.dataset.syncBound) {
+        rowsEl.dataset.syncBound = '1';
+        rowsEl.addEventListener('change', async (ev) => {
+            const row = ev.target.closest('.dup-row');
+            if (!row) return;
+            if (!ev.target.classList.contains('dup-kelas') && !ev.target.classList.contains('dup-pertemuan')) return;
+            const kelas = row.querySelector('.dup-kelas').value.trim();
+            const n = parseInt(row.querySelector('.dup-pertemuan').value, 10) || 1;
+            if (!kelas) return;
+            const kal = await lpGetKalender(kelas);
+            const item = kal[n - 1];
+            if (item) row.querySelector('.dup-tanggal').value = item.tanggal;
+        });
     }
 
     document.getElementById('modal-duplikat-lp').classList.remove('hidden');

@@ -8,6 +8,44 @@ let tabPresensiAktif = 'input';
 let tmInputAktif = 1;
 let tanggalInputAktif = '';
 let adaPerubahanPresensi = false;
+let kalenderPresensi = [];   // kalender pertemuan dari jadwal (sinkron TM <-> tanggal)
+
+// Label opsi TM: "Pertemuan N — dd/mm" jika ada di kalender jadwal
+function _tmOptionLabel(i) {
+    const item = kalenderPresensi[i - 1];
+    if (!item) return 'Pertemuan ' + i;
+    const d = new Date(item.tanggal + 'T00:00:00');
+    return 'Pertemuan ' + i + ' — ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function _rebuildTmOptions(selectEl) {
+    if (!selectEl) return;
+    let o = '';
+    for (let i = 1; i <= jumlahTMAktif; i++) o += `<option value="${i}">${_tmOptionLabel(i)}</option>`;
+    selectEl.innerHTML = o;
+}
+
+// Isi tanggal otomatis dari kalender jadwal (kecuali TM sudah punya tanggal tersimpan)
+function sinkronTanggalPresensi() {
+    const inputTgl = document.getElementById('tanggal-presensi-input');
+    const hint = document.getElementById('hint-tanggal-presensi');
+    if (!inputTgl) return;
+    const tglServer = dataPresensiAktif[0]?.tanggal?.[tmInputAktif];
+    const item = kalenderPresensi[tmInputAktif - 1];
+    if (tglServer) {
+        if (hint) hint.textContent = '';
+        return; // sudah tersimpan; renderTabelInputHarian yang mengisi
+    }
+    if (item) {
+        inputTgl.value = item.tanggal;
+        tanggalInputAktif = item.tanggal;
+        const d = new Date(item.tanggal + 'T00:00:00');
+        const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+        if (hint) hint.textContent = 'Otomatis sesuai jadwal: ' + HARI[d.getDay()] + ', ' + d.getDate() + '/' + (d.getMonth()+1) + (item.sekali ? ' (jadwal sekali)' : '') + ' — bisa diubah manual';
+    } else if (hint) {
+        hint.textContent = kalenderPresensi.length ? 'Pertemuan ini di luar kalender jadwal — isi tanggal manual' : '';
+    }
+}
 
 function initHalamanPresensi() {
     const selectNilai = document.getElementById('select-kelas-nilai');
@@ -31,7 +69,7 @@ function initHalamanPresensi() {
     if (tglInput && !tglInput.value) tglInput.value = new Date().toISOString().split('T')[0];
 
     if (selectInput) selectInput.onchange = function() { muatDataPresensi(this.value); };
-    if (selectTM) selectTM.onchange = function() { tmInputAktif = parseInt(this.value); renderTabelInputHarian(); };
+    if (selectTM) selectTM.onchange = function() { tmInputAktif = parseInt(this.value); renderTabelInputHarian(); sinkronTanggalPresensi(); };
     if (tglInput) tglInput.onchange = function() { tanggalInputAktif = this.value; adaPerubahanPresensi = true; updateStatusSimpanPresensi(); };
     if (selectRekap) selectRekap.onchange = function() { muatDataPresensi(this.value); };
 
@@ -66,14 +104,18 @@ async function muatDataPresensi(kelasValue) {
     renderPesanKosongPresensi('<span class="animate-pulse text-indigo-500">Memuat data presensi...</span>');
 
     try {
-        const data = await getDataPresensiByKelas(kelasValue);
+        const [data, kalender] = await Promise.all([
+            getDataPresensiByKelas(kelasValue),
+            getKalenderPertemuan(kelasValue).catch(() => [])
+        ]);
         dataPresensiAktif = data || [];
+        kalenderPresensi = kalender || [];
         let maxTM = 0;
         dataPresensiAktif.forEach(s => { if (s.tanggal) Object.keys(s.tanggal).forEach(k => { if (parseInt(k) > maxTM) maxTM = parseInt(k); }); });
-        jumlahTMAktif = Math.max(32, maxTM + 2);
+        jumlahTMAktif = Math.max(32, maxTM + 2, kalenderPresensi.length);
 
         const stm = document.getElementById('select-tm-presensi');
-        if (stm) { let o = ''; for (let i = 1; i <= jumlahTMAktif; i++) o += `<option value="${i}">Pertemuan ${i}</option>`; stm.innerHTML = o; }
+        _rebuildTmOptions(stm);
 
         if (tabPresensiAktif === 'input') {
             tmInputAktif = 1;
@@ -83,6 +125,7 @@ async function muatDataPresensi(kelasValue) {
             }
             if (stm) stm.value = tmInputAktif;
             renderTabelInputHarian();
+            sinkronTanggalPresensi();
         } else {
             renderTabelRekapPresensi();
         }

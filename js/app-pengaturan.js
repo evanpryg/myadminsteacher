@@ -39,6 +39,18 @@ async function initHalamanPengaturan() {
     }
 }
 
+async function muatSemesterMulai() {
+    const el = document.getElementById('pg-semester-mulai');
+    if (el) el.value = await getAppSetting('GS_SEMESTER_MULAI', '');
+}
+
+async function simpanSemesterMulai() {
+    const el = document.getElementById('pg-semester-mulai');
+    if (!el || !el.value) { alert('Pilih tanggal mulai semester terlebih dahulu.'); return; }
+    await setAppSetting('GS_SEMESTER_MULAI', el.value);
+    alert('Tanggal mulai semester tersimpan. Penomoran pertemuan otomatis mengikuti tanggal ini.');
+}
+
 function tampilkanTabPengaturan(tab) {
     ['semester','import','export','jadwal','profil','bank','prompt'].forEach(function(t) {
         const panel = document.getElementById('pg-panel-' + t);
@@ -61,6 +73,7 @@ function tampilkanTabPengaturan(tab) {
 // TAB 1: MANAJEMEN SEMESTER
 // =========================================================
 function _renderTabSemester() {
+    muatSemesterMulai();
     const data = _pgData;
     if (!data) return;
 
@@ -1374,79 +1387,113 @@ function _renderJadwalView() {
     saturdayDate.setDate(monday.getDate() + 5);
     if (rangeEl) rangeEl.textContent = _fmtTglShort(monday) + ' — ' + _fmtTglShort(saturdayDate);
 
-    let html = '';
-    hariList.forEach(function(hari, idx) {
+    // ── TIMELINE KALENDER: kolom hari + sumbu jam, event diposisikan
+    //    sesuai waktunya sehingga JEDA KOSONG terlihat secara visual ──
+    const toMin = s => { const m = /^(\d{1,2})[:.](\d{2})/.exec(String(s || '').trim()); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+
+    // Kumpulkan event per hari
+    const days = hariList.map(function(hari, idx) {
         const tglObj = new Date(monday);
         tglObj.setDate(monday.getDate() + idx);
         const tglIso = tglObj.getFullYear() + '-' + String(tglObj.getMonth()+1).padStart(2,'0') + '-' + String(tglObj.getDate()).padStart(2,'0');
         const isToday = tglObj.toDateString() === now.toDateString();
-        const color = hariColors[idx];
 
         const jadwalHari = _jadwalAllData.filter(j => j.hari === hari && jadwalSeriesAktif(j.id, tglIso, _jadwalOverrides));
-        jadwalHari.sort((a,b) => (a.jam_mulai || '').localeCompare(b.jam_mulai || ''));
-
         const skippedIds = _jadwalOverrides.filter(o => o.tanggal === tglIso && o.aksi === 'skip').map(o => o.jadwalId);
-        const tambahan = _jadwalOverrides.filter(o => o.tanggal === tglIso && o.aksi === 'tambah');
-
-        html += `<div class="bg-white rounded-2xl border ${isToday ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200'} shadow-sm overflow-hidden flex flex-col">
-            <div class="px-4 py-3 border-b ${isToday ? 'bg-indigo-600 text-white' : 'bg-slate-50 border-slate-100'} flex items-center justify-between">
-                <div>
-                    <p class="font-bold text-sm">${hari}</p>
-                    <p class="text-[10px] ${isToday ? 'text-indigo-200' : 'text-slate-400'}">${_fmtTglShort(tglObj)}</p>
-                </div>
-                <button onclick="bukaModalJadwalOneTime('${tglIso}','${hari}')" title="Tambah jadwal ${hari} ini"
-                    class="p-1.5 rounded-lg ${isToday ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'} transition-colors">
-                    <i data-lucide="plus" class="w-4 h-4"></i>
-                </button>
-            </div>
-            <div class="p-3 flex-1 space-y-2">`;
-
-        const visibleJadwal = jadwalHari.filter(j => !skippedIds.includes(j.id));
-        const skippedJadwal = jadwalHari.filter(j => skippedIds.includes(j.id));
-        if (visibleJadwal.length === 0 && tambahan.length === 0 && skippedJadwal.length === 0) {
-            html += `<p class="text-xs text-slate-400 text-center py-4">Tidak ada jadwal</p>`;
-        } else {
-            visibleJadwal.forEach(function(j) {
-                const label = _esc((j.kelas ? j.kelas + ' - ' : '') + (j.mata_pelajaran || j.mapel || ''));
-                html += `<div class="bg-${color}-50 border border-${color}-200 rounded-xl p-3 space-y-1 group/card relative">
-                    <div class="flex items-center gap-2">
-                        <span class="text-[10px] font-black text-${color}-600 bg-${color}-100 px-2 py-0.5 rounded-md">${j.jam_mulai || '?'} – ${j.jam_selesai || '?'}</span>
-                    </div>
-                    ${j.kelas ? `<p class="font-bold text-slate-800 text-xs">${_esc(j.kelas)}</p>` : ''}
-                    <p class="text-[11px] text-${color}-700 font-semibold">${_esc(j.mata_pelajaran || j.mapel)}</p>
-                    <div class="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                        <button onclick="_skipJadwal(${j.id},'${tglIso}','${label}')" title="Hapus hari ini saja" class="p-1 rounded-md bg-white/80 text-slate-400 hover:text-amber-600 hover:bg-amber-50 border border-slate-200"><i data-lucide="calendar-x" class="w-3.5 h-3.5"></i></button>
-                        <button onclick="_hapusJadwalSeri(${j.id},'${label}','${tglIso}')" title="Hapus mulai tanggal ini & seterusnya (riwayat aman)" class="p-1 rounded-md bg-white/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                    </div>
-                </div>`;
-            });
-            tambahan.forEach(function(o) {
-                const label = _esc((o.kelas ? o.kelas + ' - ' : '') + (o.mata_pelajaran || ''));
-                html += `<div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1 group/card relative">
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-md">${o.jam_mulai || '?'} – ${o.jam_selesai || '?'}</span>
-                        <span class="text-[9px] font-black text-white bg-emerald-500 px-1.5 py-0.5 rounded-md uppercase">Sekali</span>
-                    </div>
-                    ${o.kelas ? `<p class="font-bold text-slate-800 text-xs">${_esc(o.kelas)}</p>` : ''}
-                    <p class="text-[11px] text-emerald-700 font-semibold">${_esc(o.mata_pelajaran)}</p>
-                    <div class="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                        <button onclick="_hapusJadwalTambahanUI('${tglIso}','${_esc(o.id)}','${label}')" title="Hapus jadwal satu kali ini" class="p-1 rounded-md bg-white/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                    </div>
-                </div>`;
-            });
-            skippedJadwal.forEach(function(j) {
-                html += `<div class="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2 opacity-70">
-                    <div class="min-w-0">
-                        <p class="text-[10px] font-bold text-slate-400 line-through">${j.jam_mulai || '?'} – ${j.jam_selesai || '?'} · ${_esc((j.kelas ? j.kelas + ' ' : '') + (j.mata_pelajaran || j.mapel || ''))}</p>
-                        <p class="text-[9px] text-slate-400 font-semibold uppercase">Dihapus hari ini</p>
-                    </div>
-                    <button onclick="_undoSkipJadwal('${tglIso}',${j.id})" title="Kembalikan" class="shrink-0 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-200">Undo</button>
-                </div>`;
-            });
-        }
-
-        html += `</div></div>`;
+        return {
+            hari, tglObj, tglIso, isToday, color: hariColors[idx],
+            visible: jadwalHari.filter(j => !skippedIds.includes(j.id)),
+            skipped: jadwalHari.filter(j => skippedIds.includes(j.id)),
+            tambahan: _jadwalOverrides.filter(o => o.tanggal === tglIso && o.aksi === 'tambah')
+        };
     });
+
+    // Rentang jam dinamis dari data (default 07:00–15:00)
+    let minM = 7 * 60, maxM = 15 * 60;
+    days.forEach(d => {
+        [].concat(d.visible, d.skipped, d.tambahan).forEach(e => {
+            const st = toMin(e.jam_mulai), en = toMin(e.jam_selesai);
+            if (st !== null) minM = Math.min(minM, st);
+            if (en !== null) maxM = Math.max(maxM, en);
+        });
+    });
+    minM = Math.floor(minM / 60) * 60;
+    maxM = Math.ceil(maxM / 60) * 60;
+    if (maxM - minM < 240) maxM = minM + 240;
+
+    const PPM = 1.1;                       // piksel per menit
+    const bodyH = (maxM - minM) * PPM;
+    const posy = st => ((st - minM) * PPM);
+
+    // Blok event (dipakai utk normal / sekali / skip)
+    const blok = function(e, d, jenis) {
+        const st = toMin(e.jam_mulai), en = toMin(e.jam_selesai);
+        const top = st !== null ? posy(st) : 0;
+        const h = (st !== null && en !== null && en > st) ? Math.max((en - st) * PPM, 40) : 44;
+        const label = _esc((e.kelas ? e.kelas + ' - ' : '') + (e.mata_pelajaran || e.mapel || ''));
+        const c = d.color;
+        if (jenis === 'skip') {
+            return `<div class="absolute left-1 right-1 rounded-lg border border-dashed border-slate-300 bg-slate-50/90 px-1.5 py-1 overflow-hidden group/ev" style="top:${top}px;height:${Math.max(h,34)}px">
+                <p class="text-[9px] font-bold text-slate-400 line-through leading-tight truncate">${e.jam_mulai || '?'}–${e.jam_selesai || '?'} ${label}</p>
+                <button onclick="_undoSkipJadwal('${d.tglIso}',${e.id})" class="text-[9px] font-black text-indigo-600 hover:underline">Undo</button>
+            </div>`;
+        }
+        const isSekali = jenis === 'sekali';
+        const bg = isSekali ? 'bg-emerald-100/90 border-emerald-300' : `bg-${c}-100/90 border-${c}-300`;
+        const txt = isSekali ? 'text-emerald-800' : `text-${c}-800`;
+        const btns = isSekali
+            ? `<button onclick="_hapusJadwalTambahanUI('${d.tglIso}','${_esc(e.id)}','${label}')" title="Hapus jadwal satu kali ini" class="p-0.5 rounded bg-white/90 text-slate-400 hover:text-rose-600 border border-slate-200"><i data-lucide="trash-2" class="w-3 h-3"></i></button>`
+            : `<button onclick="_skipJadwal(${e.id},'${d.tglIso}','${label}')" title="Hapus hari ini saja" class="p-0.5 rounded bg-white/90 text-slate-400 hover:text-amber-600 border border-slate-200"><i data-lucide="calendar-x" class="w-3 h-3"></i></button>
+               <button onclick="_hapusJadwalSeri(${e.id},'${label}','${d.tglIso}')" title="Hapus mulai tanggal ini & seterusnya (riwayat aman)" class="p-0.5 rounded bg-white/90 text-slate-400 hover:text-rose-600 border border-slate-200"><i data-lucide="trash-2" class="w-3 h-3"></i></button>`;
+        return `<div class="absolute left-1 right-1 rounded-lg border ${bg} shadow-sm px-1.5 py-1 overflow-hidden group/ev hover:z-20 hover:shadow-md transition-shadow" style="top:${top}px;height:${h}px">
+            <p class="text-[9px] font-black ${txt} leading-tight">${e.jam_mulai || '?'}–${e.jam_selesai || '?'}${isSekali ? ' <span class="bg-emerald-500 text-white px-1 rounded uppercase">1x</span>' : ''}</p>
+            ${e.kelas ? `<p class="text-[10px] font-bold text-slate-800 leading-tight truncate">${_esc(e.kelas)}</p>` : ''}
+            <p class="text-[9px] font-semibold ${txt} leading-tight truncate">${_esc(e.mata_pelajaran || e.mapel || '')}</p>
+            <div class="absolute top-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover/ev:opacity-100 transition-opacity">${btns}</div>
+        </div>`;
+    };
+
+    // Gutter jam
+    let gutter = '';
+    for (let m = minM; m <= maxM; m += 60) {
+        gutter += `<div class="absolute right-1.5 text-[9px] font-bold text-slate-400" style="top:${posy(m) - 6}px">${String(Math.floor(m/60)).padStart(2,'0')}:00</div>`;
+    }
+
+    // Garis jam horizontal (background) per kolom hari
+    const gridBg = `background-image:repeating-linear-gradient(to bottom,#e2e8f0 0,#e2e8f0 1px,transparent 1px,transparent ${60*PPM}px);`;
+
+    // Garis "sekarang" utk hari ini
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const nowLine = (nowMin >= minM && nowMin <= maxM)
+        ? `<div class="absolute left-0 right-0 border-t-2 border-rose-400 z-10 pointer-events-none" style="top:${posy(nowMin)}px"><span class="absolute -top-1 -left-0.5 w-2 h-2 rounded-full bg-rose-400"></span></div>`
+        : '';
+
+    let html = `<div class="min-w-[840px] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="grid" style="grid-template-columns:46px repeat(6,minmax(126px,1fr));">
+            <div class="border-b border-slate-100 bg-slate-50"></div>`;
+    days.forEach(d => {
+        html += `<div class="border-b border-l border-slate-100 ${d.isToday ? 'bg-indigo-600 text-white' : 'bg-slate-50'} px-2.5 py-2 flex items-center justify-between">
+            <div>
+                <p class="font-bold text-xs">${d.hari}</p>
+                <p class="text-[9px] ${d.isToday ? 'text-indigo-200' : 'text-slate-400'}">${_fmtTglShort(d.tglObj)}</p>
+            </div>
+            <button onclick="bukaModalJadwalOneTime('${d.tglIso}','${d.hari}')" title="Tambah jadwal ${d.hari} ini"
+                class="p-1 rounded-lg ${d.isToday ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'} transition-colors">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>`;
+    });
+    // Baris badan: gutter + 6 kolom timeline
+    html += `<div class="relative bg-slate-50/50" style="height:${bodyH + 16}px">${gutter}</div>`;
+    days.forEach(d => {
+        html += `<div class="relative border-l border-slate-100 ${d.isToday ? 'bg-indigo-50/40' : ''}" style="height:${bodyH + 16}px;${gridBg}">
+            ${d.isToday ? nowLine : ''}
+            ${d.visible.map(e => blok(e, d, 'normal')).join('')}
+            ${d.tambahan.map(e => blok(e, d, 'sekali')).join('')}
+            ${d.skipped.map(e => blok(e, d, 'skip')).join('')}
+        </div>`;
+    });
+    html += `</div></div>`;
 
     grid.innerHTML = html;
     lucide.createIcons();
