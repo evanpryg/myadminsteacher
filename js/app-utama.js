@@ -52,6 +52,7 @@ function pindahHalaman(target) {
         'jadwalview':     document.getElementById('halaman-jadwalview'),
         'datamaster':     document.getElementById('halaman-datamaster'),
         'lessonplan':     document.getElementById('halaman-lessonplan'),
+        'modulajar':      document.getElementById('halaman-modulajar'),
         'quicklinks':     document.getElementById('halaman-quicklinks'),
         'pengaturan':     document.getElementById('halaman-pengaturan')
     };
@@ -66,6 +67,7 @@ function pindahHalaman(target) {
         'jadwalview':     document.getElementById('btn-nav-jadwalview'),
         'datamaster':     document.getElementById('btn-nav-datamaster'),
         'lessonplan':     document.getElementById('btn-nav-lessonplan'),
+        'modulajar':      document.getElementById('btn-nav-modulajar'),
         'quicklinks':     document.getElementById('btn-nav-quicklinks'),
         'pengaturan':     document.getElementById('btn-nav-pengaturan')
     };
@@ -100,6 +102,7 @@ function pindahHalaman(target) {
         'jadwalview':     'Jadwal Mengajar',
         'datamaster':     'Data',
         'lessonplan':     'Lesson Plan Generator',
+        'modulajar':      'Modul Ajar Generator',
         'quicklinks':     'Quick Links',
         'pengaturan':     'Kelola Data & Semester'
     };
@@ -115,6 +118,7 @@ function pindahHalaman(target) {
     if (target === 'datamaster' && typeof initHalamanDataMaster === 'function') initHalamanDataMaster();
     if (target === 'pengaturan' && typeof initHalamanPengaturan === 'function') initHalamanPengaturan();
     if (target === 'lessonplan' && typeof initHalamanLessonPlan === 'function') initHalamanLessonPlan();
+    if (target === 'modulajar' && typeof initHalamanModulAjar === 'function') initHalamanModulAjar();
     if (target === 'quicklinks' && typeof initHalamanQuickLinks === 'function') initHalamanQuickLinks();
     if (target === 'catatansiswa' && typeof initHalamanCatatanSiswa === 'function') initHalamanCatatanSiswa();
     if (target === 'jurnalmengajar' && typeof initHalamanJurnalMengajar === 'function') initHalamanJurnalMengajar();

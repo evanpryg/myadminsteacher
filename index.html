@@ -68,6 +68,10 @@
                             class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left mb-1">
                         <i data-lucide="bot" class="w-5 h-5 text-indigo-600"></i> Lesson Plan Generator
                     </button>
+                    <button onclick="pindahHalaman('modulajar')" id="btn-nav-modulajar"
+                            class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left mb-1">
+                        <i data-lucide="book-open-check" class="w-5 h-5 text-indigo-600"></i> Modul Ajar Generator
+                    </button>
                     <button onclick="pindahHalaman('quicklinks')" id="btn-nav-quicklinks"
                             class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left mb-1">
                         <i data-lucide="link" class="w-5 h-5 text-indigo-600"></i> Quick Links
@@ -1380,6 +1384,126 @@
                     </div>
                 </div>
             </div><!-- /halaman-lessonplan -->
+
+            <!-- ============================================================
+                 HALAMAN MODUL AJAR GENERATOR
+                 ============================================================ -->
+            <div id="halaman-modulajar" class="hidden space-y-5">
+                <!-- List view -->
+                <div id="ma-list-view" class="space-y-4">
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base">Modul Ajar Generator</h3>
+                            <p class="text-xs text-slate-400">Isi form minimal → AI menyusun modul ajar lengkap (16 lampiran) → download Word. Koreksi langsung di Word.</p>
+                        </div>
+                        <button onclick="maBukaForm()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>Buat Baru
+                        </button>
+                    </div>
+                    <div id="ma-list-loader" class="py-10 text-center text-indigo-500 animate-pulse font-semibold text-sm hidden">Memuat daftar modul ajar...</div>
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse" style="min-width: 760px;">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                        <th class="py-3 px-4 w-28">Dibuat</th>
+                                        <th class="py-3 px-3 w-36">Mata Pelajaran</th>
+                                        <th class="py-3 px-3 w-24">Fase/Kelas</th>
+                                        <th class="py-3 px-3">Topik/Materi</th>
+                                        <th class="py-3 px-3 text-center w-32">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ma-table-body" class="text-xs font-medium text-slate-600 divide-y divide-slate-100">
+                                    <tr><td colspan="5" class="py-12 text-center text-slate-400 font-semibold">Belum ada modul ajar.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form view -->
+                <div id="ma-form-view" class="hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 flex items-center gap-3">
+                        <button onclick="maKembaliKeList()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+                        <div>
+                            <h3 id="ma-form-title" class="font-bold text-slate-800 text-base">Buat Modul Ajar</h3>
+                            <p class="text-[11px] text-slate-400">AI mengisi seluruh isi & lampiran — Anda cukup 4-6 field ini</p>
+                        </div>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <datalist id="ma-dl-mapel"></datalist>
+                        <datalist id="ma-dl-kelas"></datalist>
+                        <datalist id="ma-dl-model"></datalist>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Mata Pelajaran <span class="text-rose-500">*</span></label>
+                                <input type="text" id="ma-f-mapel" list="ma-dl-mapel" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Kelas <span class="text-rose-500">*</span></label>
+                                <input type="text" id="ma-f-kelas" list="ma-dl-kelas" placeholder="XI" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Fase</label>
+                                <select id="ma-f-fase" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"><option>F</option><option>E</option></select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Topik / Materi <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <input type="text" id="lp-f-ma-ma_topik" data-bank="MATERI" autocomplete="off" placeholder="Ketik untuk mencari di bank MATERI, atau tulis baru" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                <div id="lp-bank-dd-ma_topik" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-40 max-h-64 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 md:grid-cols-6 gap-4">
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Jml Pertemuan</label>
+                                <input type="number" id="ma-f-jumlah" value="2" min="1" max="6" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">JP / Pertemuan</label>
+                                <input type="number" id="ma-f-jp" value="2" min="1" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Menit / JP</label>
+                                <input type="number" id="ma-f-menit" value="40" min="20" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            </div>
+                            <div class="col-span-3">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Model Pembelajaran <span class="text-rose-500">*</span></label>
+                                <input type="text" id="ma-f-model" list="ma-dl-model" placeholder="Problem Based Learning berbasis Deep Learning" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Capaian Pembelajaran (opsional — AI mengisi jika kosong)</label>
+                            <div class="relative">
+                                <textarea id="lp-f-ma-ma_cp" rows="3" data-bank="CP" autocomplete="off" placeholder="Ketik untuk mencari di bank CP, atau kosongkan agar AI mengambil dari panduan resmi" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
+                                <div id="lp-bank-dd-ma_cp" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-40 max-h-64 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Catatan Khusus (opsional)</label>
+                            <input type="text" id="ma-f-catatan" placeholder="Mis. fokuskan pada praktikum sederhana, siswa kelas heterogen..." class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                        </div>
+                        <div class="flex justify-end pt-4 border-t border-slate-100">
+                            <button onclick="maGenerateSekarang()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm flex items-center gap-2 transition-all shadow-sm">
+                                <i data-lucide="sparkles" class="w-4 h-4 text-amber-300"></i>Generate & Download Word
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading view -->
+                <div id="ma-loading-view" class="hidden bg-white border border-slate-200 rounded-2xl shadow-sm p-16 text-center space-y-5">
+                    <div class="relative w-16 h-16 mx-auto">
+                        <div class="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                        <div class="absolute inset-0 flex items-center justify-center"><i data-lucide="book-open-check" class="w-6 h-6 text-indigo-600 animate-pulse"></i></div>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="font-bold text-slate-800 text-base">Sedang Menyusun Modul Ajar Lengkap...</p>
+                        <p class="text-xs text-slate-400 max-w-md mx-auto">AI menyusun seluruh isi termasuk langkah tiap pertemuan, LKPD, rubrik, dan 15 lampiran. Ini bisa memakan waktu 1-2 menit — jangan tutup halaman.</p>
+                    </div>
+                </div>
+            </div><!-- /halaman-modulajar -->
         </div>
 
         <div id="modal-detail-bab" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-all">
@@ -1714,6 +1838,10 @@
     <script src="js/lp-ai.js"></script>
     <script src="js/lp-docx.js"></script>
     <script src="js/app-lessonplan.js"></script>
+    <!-- Modul Ajar Generator (reuse adapter Gemini + renderer docxtemplater LP) -->
+    <script src="js/ma-ai.js"></script>
+    <script src="js/ma-docx.js"></script>
+    <script src="js/app-modulajar.js"></script>
     <script src="js/app-catatan-jurnal.js"></script>
     <script src="js/app-notifikasi.js"></script>
     <!-- Lesson Plan AI: Disabled temporarily -->

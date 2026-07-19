@@ -14,6 +14,7 @@
 1. Jalankan `supabase-migration.sql` di Supabase SQL Editor.
 2. Jalankan `supabase-migration-lessonplan.sql` (fitur Lesson Plan Generator).
 3. Jalankan `supabase-migration-cptp.sql` (bank Materi/CP/TP — aman dijalankan ulang).
+4. Jalankan `supabase-migration-modulajar.sql` (fitur Modul Ajar Generator).
 
 ## Struktur File
 
@@ -87,6 +88,23 @@ dimensi/asesmen) diisi atau disarankan AI dan tetap bisa diedit di step review.
 "Materi & CP/TP" (tambah/edit/hapus) — idealnya disiapkan di awal semester.
 Di form generator, field Materi/CP/TP memakai dropdown ketik-cari dari bank;
 entri baru yang ditulis langsung di generator otomatis tersimpan ke bank.
+
+### Modul Ajar Generator
+
+Mirip lesson plan tapi lebih sederhana: **form minimal (mapel, kelas, topik,
+jumlah pertemuan, model) → AI menyusun seluruh modul ajar → langsung download
+Word** — tanpa editor di aplikasi, koreksi langsung di Word. Riwayat tersimpan
+di tabel `modul_ajar` (download ulang / generate ulang / hapus).
+
+- Template: `templates/modul-ajar-sma-v1.docx` (loop `{{#pertemuan}}` utk
+  langkah AWAL-INTI-PENUTUP per pertemuan + LKPD & kunci jawaban per
+  pertemuan; loop tabel indikator/asesmen/rubrik/glosarium; checkbox
+  `{{chk_dpl_*}}` utk Dimensi Profil Lulusan).
+- Aturan reviewer (komentar "Feedback FF" di contoh modul ajar) dibakukan di
+  prompt: kemitraan konkret, lingkungan dibagi Ruang Fisik/Virtual/Budaya,
+  media digital harus konsisten dgn langkah, "Merefleksi" = refleksi
+  extended abstract, TP selaras CP panduan resmi.
+- Topik & CP terhubung bank Materi/CP (typeahead, auto-save).
 
 ### Jadwal: sekali vs berulang
 
