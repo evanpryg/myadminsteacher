@@ -63,7 +63,8 @@ function maFlattenData(form, aiData, settings) {
 
 async function maExportDocx(row) {
     const settings = await getMultipleSettings(['GS_NAMA_GURU', 'GS_TAHUN_AJARAN', 'GS_LP_FILE_CODE']);
-    const resp = await fetch(MA_TEMPLATE_URL, { cache: 'no-cache' });
+    // Cache-buster: CDN GitHub Pages cache 10 menit & abaikan no-cache browser
+    const resp = await fetch(MA_TEMPLATE_URL + '?v=' + Date.now(), { cache: 'no-cache' });
     if (!resp.ok) throw new Error('Gagal mengunduh template modul ajar (' + resp.status + ')');
     const buffer = await resp.arrayBuffer();
 

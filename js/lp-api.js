@@ -36,8 +36,10 @@ async function lpGetTemplateById(id) {
 
 // Unduh file .docx template sebagai ArrayBuffer.
 // file_url boleh relatif (di-hosting bareng web) atau URL penuh (Supabase Storage dll).
+// Query cache-buster WAJIB: CDN GitHub Pages meng-cache 10 menit dan
+// mengabaikan cache:'no-cache' dari browser; query unik memaksa ambil fresh.
 async function lpFetchTemplateFile(template) {
-    const url = template.file_url;
+    const url = template.file_url + (template.file_url.indexOf('?') === -1 ? '?' : '&') + 'v=' + Date.now();
     const resp = await fetch(url, { cache: 'no-cache' });
     if (!resp.ok) throw new Error('Gagal mengunduh template DOCX (' + resp.status + '): ' + url);
     return await resp.arrayBuffer();
