@@ -28,6 +28,8 @@ function maFlattenData(form, aiData, settings) {
         Lingkungan: aiData.lingkungan || '',
         Digital: aiData.digital || '',
         Indikator_Pengetahuan: aiData.indikator_pengetahuan || '',
+        Bentuk_Pengetahuan: aiData.bentuk_pengetahuan || '',
+        Aspek_Sikap: (aiData.rubrik_sikap || []).map(r => r.aspek).join('\n'),
         Produk_Keterampilan: aiData.produk_keterampilan || '',
         Daftar_Pustaka: aiData.daftar_pustaka || '',
         Diagnostik_Kognitif: aiData.diagnostik_kognitif || '',
@@ -41,10 +43,15 @@ function maFlattenData(form, aiData, settings) {
         rubrik_produk: aiData.rubrik_produk || [],
         rubrik_presentasi: aiData.rubrik_presentasi || [],
         rubrik_diskusi: aiData.rubrik_diskusi || [],
+        rubrik_sikap: aiData.rubrik_sikap || [],
         diagnostik_pernyataan: aiData.diagnostik_pernyataan || [],
         glosarium: aiData.glosarium || [],
         pertemuan: aiData.pertemuan || []
     };
+
+    // Kolom aspek lembar observasi (tetap 4 kolom)
+    (aiData.observasi_aspek || []).forEach((a, i) => { data['obs_aspek_' + (i + 1)] = a; });
+    for (let i = 1; i <= 4; i++) if (!data['obs_aspek_' + i]) data['obs_aspek_' + i] = 'Aspek ' + i;
 
     // Checkbox Dimensi Profil Lulusan
     const dipilih = aiData.dpl || [];

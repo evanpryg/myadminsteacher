@@ -31,6 +31,7 @@ const MA_TEXT_FIELDS = [
     ['lingkungan', 'lingkungan pembelajaran'],
     ['digital', 'pemanfaatan digital (satu per baris)'],
     ['indikator_pengetahuan', 'indikator penilaian pengetahuan (satu per baris, awali "✔ ")'],
+    ['bentuk_pengetahuan', 'bentuk penilaian pengetahuan yang sesuai topik (satu per baris)'],
     ['produk_keterampilan', 'nama produk penilaian keterampilan'],
     ['daftar_pustaka', 'daftar pustaka relevan (format APA, satu per baris)'],
     ['cp', 'Capaian Pembelajaran resmi mapel ini utk fase tsb'],
@@ -76,6 +77,8 @@ ${textFields}
 - "rubrik_produk": (array 4-5) { "aspek": string, "skor": integer } total skor = 100
 - "rubrik_presentasi": (array 4-5) { "aspek": string, "skor": integer } total = 100
 - "rubrik_diskusi": (array 4-5) { "aspek": string, "skor": integer } total = 100
+- "rubrik_sikap": (array 4-6 string) aspek sikap yang dinilai relevan pembelajaran ini (mis. disiplin, kerja sama)
+- "observasi_aspek": (array TEPAT 4 string) aspek kolom lembar observasi diskusi (singkat, 1-3 kata)
 - "diagnostik_pernyataan": (array 5-6 string) pernyataan diagnostik non-kognitif (dijawab Ya/Tidak)
 - "glosarium": (array 6-10 objek) { "istilah": string, "arti": string }
 - "pertemuan": (array TEPAT ${form.jumlah_pertemuan} objek, satu per pertemuan) {
@@ -123,6 +126,13 @@ function maValidateAiData(json, form) {
     ['rubrik_produk', 'rubrik_presentasi', 'rubrik_diskusi'].forEach(k => {
         out[k] = asArr(json[k], x => x && ({ aspek: asText(x.aspek), skor: parseInt(x.skor, 10) || 0 }));
     });
+    out.rubrik_sikap = asArr(json.rubrik_sikap, x => {
+        const a = asText(x && x.aspek !== undefined ? x.aspek : x);
+        return a ? { aspek: a } : null;
+    });
+    if (out.rubrik_sikap.length === 0) out.rubrik_sikap = [{ aspek: 'Disiplin' }, { aspek: 'Tanggung jawab' }, { aspek: 'Kerja sama' }, { aspek: 'Percaya diri' }, { aspek: 'Santun' }];
+    out.observasi_aspek = asArr(json.observasi_aspek, x => asText(x)).filter(Boolean).slice(0, 4);
+    while (out.observasi_aspek.length < 4) out.observasi_aspek.push('Aspek ' + (out.observasi_aspek.length + 1));
     out.diagnostik_pernyataan = asArr(json.diagnostik_pernyataan, x => ({ p: asText(x && x.p !== undefined ? x.p : x) })).filter(x => x.p);
     out.glosarium = asArr(json.glosarium, x => x && ({ istilah: asText(x.istilah), arti: asText(x.arti) }));
 
