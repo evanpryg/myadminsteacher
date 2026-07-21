@@ -1425,15 +1425,49 @@ function _renderJadwalView() {
     const bodyH = (maxM - minM) * PPM;
     const posy = st => ((st - minM) * PPM);
 
+    // Pembagian kolom utk jadwal yang BENTROK jam (ala Google Calendar):
+    // event yang tumpang tindih dibagi berdampingan (kolom), sehingga
+    // semua jadwal tetap terlihat & bisa dipilih utk dihapus/dibiarkan.
+    const layoutColumns = function(evs) {
+        const timed = [], untimed = [];
+        evs.forEach(e => {
+            const st = toMin(e.jam_mulai), en = toMin(e.jam_selesai);
+            e._st = st; e._en = en;
+            if (st !== null && en !== null && en > st) timed.push(e); else untimed.push(e);
+        });
+        timed.sort((a, b) => a._st - b._st || b._en - a._en);
+        let cluster = [], colsEnd = [], clusterMaxEnd = -Infinity;
+        const flush = () => {
+            const n = colsEnd.length || 1;
+            cluster.forEach(ev => { ev._cols = n; });
+            cluster = []; colsEnd = [];
+        };
+        timed.forEach(ev => {
+            if (cluster.length && ev._st >= clusterMaxEnd) { flush(); clusterMaxEnd = -Infinity; }
+            let placed = false;
+            for (let c = 0; c < colsEnd.length; c++) {
+                if (colsEnd[c] <= ev._st) { ev._col = c; colsEnd[c] = ev._en; placed = true; break; }
+            }
+            if (!placed) { ev._col = colsEnd.length; colsEnd.push(ev._en); }
+            cluster.push(ev);
+            clusterMaxEnd = Math.max(clusterMaxEnd, ev._en);
+        });
+        flush();
+        untimed.forEach(ev => { ev._col = 0; ev._cols = 1; });
+    };
+
     // Blok event (dipakai utk normal / sekali / skip)
     const blok = function(e, d, jenis) {
         const st = toMin(e.jam_mulai), en = toMin(e.jam_selesai);
         const top = st !== null ? posy(st) : 0;
         const h = (st !== null && en !== null && en > st) ? Math.max((en - st) * PPM, 40) : 44;
+        const cols = e._cols || 1, col = e._col || 0;
+        const pos = 'left:calc(' + (col / cols * 100).toFixed(4) + '% + 2px);width:calc(' + (100 / cols).toFixed(4) + '% - 4px);top:' + top + 'px;';
         const label = _esc((e.kelas ? e.kelas + ' - ' : '') + (e.mata_pelajaran || e.mapel || ''));
+        const jamLabel = (e.jam_mulai || '?') + '–' + (e.jam_selesai || '?');
         if (jenis === 'skip') {
-            return `<div class="absolute left-1 right-1 rounded-lg border border-dashed border-slate-300 bg-slate-50/90 px-1.5 py-1 overflow-hidden group/ev" style="top:${top}px;height:${Math.max(h,34)}px">
-                <p class="text-[9px] font-bold text-slate-400 line-through leading-tight truncate">${e.jam_mulai || '?'}–${e.jam_selesai || '?'} ${label}</p>
+            return `<div class="absolute rounded-lg border border-dashed border-slate-300 bg-slate-50/90 px-1.5 py-1 overflow-hidden group/ev hover:z-30" style="${pos}height:${Math.max(h,34)}px" title="Dihapus hari ini: ${jamLabel} ${label}">
+                <p class="text-[9px] font-bold text-slate-400 line-through leading-tight truncate">${jamLabel} ${label}</p>
                 <button onclick="_undoSkipJadwal('${d.tglIso}',${e.id})" class="text-[9px] font-black text-indigo-600 hover:underline">Undo</button>
             </div>`;
         }
@@ -1448,12 +1482,15 @@ function _renderJadwalView() {
         };
         const pal = katPalette[kat] || katPalette.Normal;
         const bg = pal[0], txt = pal[1];
+        const bentrok = cols > 1;
         const btns = isSekali
             ? `<button onclick="_hapusJadwalTambahanUI('${d.tglIso}','${_esc(e.id)}','${label}')" title="Hapus jadwal satu kali ini" class="p-0.5 rounded bg-white/90 text-slate-400 hover:text-rose-600 border border-slate-200"><i data-lucide="trash-2" class="w-3 h-3"></i></button>`
             : `<button onclick="_skipJadwal(${e.id},'${d.tglIso}','${label}')" title="Hapus hari ini saja" class="p-0.5 rounded bg-white/90 text-slate-400 hover:text-amber-600 border border-slate-200"><i data-lucide="calendar-x" class="w-3 h-3"></i></button>
                <button onclick="_hapusJadwalSeri(${e.id},'${label}','${d.tglIso}')" title="Hapus mulai tanggal ini & seterusnya (riwayat aman)" class="p-0.5 rounded bg-white/90 text-slate-400 hover:text-rose-600 border border-slate-200"><i data-lucide="trash-2" class="w-3 h-3"></i></button>`;
-        return `<div class="absolute left-1 right-1 rounded-lg border ${bg} shadow-sm px-1.5 py-1 overflow-hidden group/ev hover:z-20 hover:shadow-md transition-shadow" style="top:${top}px;height:${h}px">
-            <p class="text-[9px] font-black ${txt} leading-tight">${e.jam_mulai || '?'}–${e.jam_selesai || '?'}${isSekali ? ' <span class="bg-emerald-500 text-white px-1 rounded uppercase">1x</span>' : ''}</p>
+        // Saat bentrok (kolom sempit), hover memperlebar blok ke seluruh kolom hari agar detail terbaca
+        const hoverExpand = bentrok ? ' hover:!left-1 hover:!right-1 hover:!w-auto' : '';
+        return `<div class="absolute rounded-lg border ${bg} shadow-sm px-1.5 py-1 overflow-hidden group/ev hover:z-30 hover:shadow-md transition-all${hoverExpand}" style="${pos}height:${h}px" title="${jamLabel} · ${label}${bentrok ? ' (bentrok jam)' : ''}">
+            <p class="text-[9px] font-black ${txt} leading-tight truncate">${jamLabel}${isSekali ? ' <span class="bg-emerald-500 text-white px-1 rounded uppercase">1x</span>' : ''}${bentrok ? ' <span class="bg-rose-500 text-white px-1 rounded uppercase">bentrok</span>' : ''}</p>
             ${e.kelas ? `<p class="text-[10px] font-bold text-slate-800 leading-tight truncate">${_esc(e.kelas)}</p>` : ''}
             <p class="text-[9px] font-semibold ${txt} leading-tight truncate">${_esc(e.mata_pelajaran || e.mapel || '')}</p>
             <div class="absolute top-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover/ev:opacity-100 transition-opacity">${btns}</div>
@@ -1501,11 +1538,17 @@ function _renderJadwalView() {
     // Baris badan: gutter + 6 kolom timeline
     html += `<div class="relative bg-slate-50/50" style="height:${bodyH + 16}px">${gutter}</div>`;
     days.forEach(d => {
+        // Semua event hari ini (aktif + sekali + dihapus) di-layout bersama
+        // agar jadwal yang bentrok jam tampil berdampingan, bukan tertutup.
+        const items = [].concat(
+            d.visible.map(e => ({ e: e, type: 'normal' })),
+            d.tambahan.map(e => ({ e: e, type: 'sekali' })),
+            d.skipped.map(e => ({ e: e, type: 'skip' }))
+        );
+        layoutColumns(items.map(it => it.e));
         html += `<div class="relative border-l border-slate-100 ${d.isToday ? 'bg-indigo-50/40' : ''}" style="height:${bodyH + 16}px;${gridBg}">
             ${d.isToday ? nowLine : ''}
-            ${d.visible.map(e => blok(e, d, 'normal')).join('')}
-            ${d.tambahan.map(e => blok(e, d, 'sekali')).join('')}
-            ${d.skipped.map(e => blok(e, d, 'skip')).join('')}
+            ${items.map(it => blok(it.e, d, it.type)).join('')}
         </div>`;
     });
     html += `</div></div>`;
