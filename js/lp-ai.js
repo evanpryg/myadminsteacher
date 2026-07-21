@@ -152,7 +152,7 @@ function lpValidateAiData(json, model) {
 // ---------- Provider Adapter ----------
 const LP_AI_PROVIDERS = {
     gemini: {
-        defaultModel: 'gemini-2.5-flash',
+        defaultModel: 'gemini-3.5-flash',
         async generateJSON(prompt, apiKey, modelName) {
             const url = 'https://generativelanguage.googleapis.com/v1beta/models/'
                 + encodeURIComponent(modelName || this.defaultModel)
