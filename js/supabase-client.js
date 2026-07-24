@@ -9,7 +9,12 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
  */
 let _lastSupabaseError = '';
 
-async function fetchSupabase(path, method, payload, extraHeaders) {
+// PostgREST/Supabase membatasi hasil GET maksimal 1000 baris per permintaan.
+// Tanpa paging, data ke-1001 dst tidak pernah terbaca (mis. siswa > 1000).
+const SUPABASE_PAGE_SIZE = 1000;
+const SUPABASE_MAX_ROWS = 100000;   // pengaman agar tidak berputar tanpa henti
+
+async function _fetchSupabaseOnce(path, method, payload, extraHeaders) {
     const url = SUPABASE_URL + path;
     const options = {
         method: method || "GET",
@@ -44,6 +49,36 @@ async function fetchSupabase(path, method, payload, extraHeaders) {
         console.error("Network Error:", e);
         return null;
     }
+}
+
+// Ambil SEMUA baris dgn paging Range. Tabel <= 1000 baris tetap 1 permintaan.
+async function _fetchSupabaseAllPages(path, extraHeaders) {
+    let hasil = [];
+    let dari = 0;
+    while (dari < SUPABASE_MAX_ROWS) {
+        const headers = Object.assign({}, extraHeaders || {}, {
+            "Range-Unit": "items",
+            "Range": dari + "-" + (dari + SUPABASE_PAGE_SIZE - 1)
+        });
+        const halaman = await _fetchSupabaseOnce(path, "GET", null, headers);
+        if (halaman === null) return dari === 0 ? null : hasil;   // gagal di halaman pertama
+        if (!Array.isArray(halaman)) return halaman;              // bukan daftar baris
+        hasil = hasil.concat(halaman);
+        if (halaman.length < SUPABASE_PAGE_SIZE) break;           // halaman terakhir
+        dari += SUPABASE_PAGE_SIZE;
+    }
+    return hasil;
+}
+
+async function fetchSupabase(path, method, payload, extraHeaders) {
+    const m = (method || "GET").toUpperCase();
+    // GET tanpa limit/Range eksplisit -> ambil seluruh baris (auto-paging)
+    const adaLimit = /[?&]limit=/.test(path);
+    const adaRange = extraHeaders && (extraHeaders.Range || extraHeaders.range);
+    if (m === "GET" && !adaLimit && !adaRange) {
+        return await _fetchSupabaseAllPages(path, extraHeaders);
+    }
+    return await _fetchSupabaseOnce(path, m, payload, extraHeaders);
 }
 
 /**

@@ -24,7 +24,13 @@ async function initHalamanPengaturan() {
     try {
         const data = await getPengaturanData();
         _pgData = data;
-        _pgNisAktif = new Set((data.nisSiswaAktif || []));
+        // NIS yang sudah ada -> dipakai menandai duplikat saat import siswa.
+        // getPengaturanData tidak menyediakannya, jadi diambil langsung.
+        try {
+            _pgNisAktif = new Set((await getNisSiswaAktif()).map(n => String(n).trim()));
+        } catch (e) {
+            _pgNisAktif = new Set();
+        }
         if (loader)  loader.classList.add('hidden');
         if (content) {
             content.classList.remove('hidden');
