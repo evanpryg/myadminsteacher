@@ -1087,15 +1087,40 @@ async function muatDmGuru() {
     }
 }
 
+// Sortir tabel guru: bisa berdasarkan kode ATAU nama, naik/turun
+let _dmGuruSort = { by: 'kode', dir: 'asc' };
+
+function urutkanGuru(by) {
+    if (_dmGuruSort.by === by) _dmGuruSort.dir = (_dmGuruSort.dir === 'asc' ? 'desc' : 'asc');
+    else _dmGuruSort = { by: by, dir: 'asc' };
+    renderDmGuru();
+}
+
+function _bandingGuru(a, b) {
+    const key = _dmGuruSort.by === 'nama' ? 'nama' : 'kode_guru';
+    // numeric:true -> kode bernomor tanpa nol depan tetap urut benar (G2 sebelum G10)
+    const r = String(a[key] || '').localeCompare(String(b[key] || ''), 'id', { numeric: true, sensitivity: 'base' });
+    return _dmGuruSort.dir === 'desc' ? -r : r;
+}
+
 function renderDmGuru() {
     const tbody = document.getElementById('dm-tbody-guru');
     if (!tbody) return;
     const q = (document.getElementById('dm-guru-cari')?.value || '').toLowerCase().trim();
-    const data = q
+    const data = (q
         ? _dmGuruData.filter(g => (g.nama || '').toLowerCase().includes(q) || (g.kode_guru || '').toLowerCase().includes(q))
-        : _dmGuruData;
+        : _dmGuruData.slice()).sort(_bandingGuru);
+
+    // Indikator panah pada header yang aktif
+    const panah = _dmGuruSort.dir === 'asc' ? '↑' : '↓';
+    const indKode = document.getElementById('dm-guru-sort-kode');
+    const indNama = document.getElementById('dm-guru-sort-nama');
+    if (indKode) indKode.textContent = _dmGuruSort.by === 'kode' ? panah : '';
+    if (indNama) indNama.textContent = _dmGuruSort.by === 'nama' ? panah : '';
+
     const info = document.getElementById('dm-guru-info');
-    if (info) info.textContent = _dmGuruData.length + ' guru' + (q ? ' · ' + data.length + ' cocok' : '');
+    if (info) info.textContent = _dmGuruData.length + ' guru' + (q ? ' · ' + data.length + ' cocok' : '')
+        + ' · urut ' + (_dmGuruSort.by === 'nama' ? 'nama' : 'kode') + ' ' + (_dmGuruSort.dir === 'asc' ? 'A→Z' : 'Z→A');
     if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-slate-400 font-semibold">' + (q ? 'Tidak ada guru yang cocok.' : 'Belum ada data guru. Gunakan "Import Guru" untuk menambah banyak sekaligus.') + '</td></tr>'; return; }
     tbody.innerHTML = data.map(function(g, i) {
         return `<tr class="hover:bg-slate-50 group"><td class="py-2 px-3 text-slate-400">${i+1}</td><td class="py-2 px-3 font-mono font-bold text-indigo-600">${_esc(g.kode_guru)}</td><td class="py-2 px-3 font-semibold text-slate-800">${_esc(g.nama)}</td><td class="py-2 px-3 text-center"><div class="flex justify-center gap-1 opacity-0 group-hover:opacity-100"><button onclick="editGuruUI(${g.id},'${_esc(g.kode_guru)}','${_esc(g.nama)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button><button onclick="hapusGuruUI(${g.id},'${_esc(g.nama)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div></td></tr>`;
@@ -1357,6 +1382,9 @@ async function _populateGuruDropdownWali(selectedValue) {
             return;
         }
         sel.innerHTML = '<option value="">— Pilih Guru —</option>';
+        // Dropdown SELALU urut alfabetis berdasarkan nama guru
+        guru = guru.slice().sort((a, b) =>
+            String(a.nama || a.nama_guru || '').localeCompare(String(b.nama || b.nama_guru || ''), 'id', { sensitivity: 'base' }));
         guru.forEach(function(g) {
             const nm = g.nama || g.nama_guru || '';
             sel.innerHTML += `<option value="${_esc(nm)}" ${nm === selectedValue ? 'selected' : ''}>${_esc(nm)}${g.kode_guru ? ' (' + _esc(g.kode_guru) + ')' : ''}</option>`;

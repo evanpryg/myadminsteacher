@@ -244,7 +244,10 @@ async function buatSemesterBaru(ta, sem, opsi) {
 // ── GURU & WALI KELAS ───────────────────────────────────────
 // Kolom asli tabel data_guru: id, kode_guru, nama_guru (mapel tidak dipakai).
 async function getDataGuru() {
-    const data = await fetchSupabase("/rest/v1/data_guru?select=id,kode_guru,nama_guru&order=nama_guru", "GET") || [];
+    const data = await fetchSupabase("/rest/v1/data_guru?select=id,kode_guru,nama_guru&order=kode_guru", "GET") || [];
+    // Urut berdasarkan KODE guru. Pakai natural sort agar kode bernomor
+    // tanpa nol di depan tetap benar (G2 sebelum G10, bukan sesudahnya).
+    data.sort((a, b) => String(a.kode_guru || '').localeCompare(String(b.kode_guru || ''), 'id', { numeric: true, sensitivity: 'base' }));
     // Normalisasi: sediakan .nama agar pemakai lama tetap jalan
     return data.map(g => ({ ...g, nama: g.nama_guru }));
 }
