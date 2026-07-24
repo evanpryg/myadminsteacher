@@ -1090,9 +1090,15 @@ async function muatDmGuru() {
 function renderDmGuru() {
     const tbody = document.getElementById('dm-tbody-guru');
     if (!tbody) return;
-    if (_dmGuruData.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400 font-semibold">Belum ada data guru.</td></tr>'; return; }
-    tbody.innerHTML = _dmGuruData.map(function(g, i) {
-        return `<tr class="hover:bg-slate-50 group"><td class="py-2 px-3 text-slate-400">${i+1}</td><td class="py-2 px-3 font-mono font-bold text-indigo-600">${_esc(g.kode_guru || g.kode)}</td><td class="py-2 px-3 font-semibold text-slate-800">${_esc(g.nama)}</td><td class="py-2 px-3 text-slate-600">${_esc(g.mata_pelajaran || g.mapel)}</td><td class="py-2 px-3 text-center"><div class="flex justify-center gap-1 opacity-0 group-hover:opacity-100"><button onclick="editGuruUI(${g.id},'${_esc(g.kode_guru || g.kode)}','${_esc(g.nama)}','${_esc(g.mata_pelajaran || g.mapel)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button><button onclick="hapusGuruUI(${g.id},'${_esc(g.nama)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div></td></tr>`;
+    const q = (document.getElementById('dm-guru-cari')?.value || '').toLowerCase().trim();
+    const data = q
+        ? _dmGuruData.filter(g => (g.nama || '').toLowerCase().includes(q) || (g.kode_guru || '').toLowerCase().includes(q))
+        : _dmGuruData;
+    const info = document.getElementById('dm-guru-info');
+    if (info) info.textContent = _dmGuruData.length + ' guru' + (q ? ' · ' + data.length + ' cocok' : '');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-slate-400 font-semibold">' + (q ? 'Tidak ada guru yang cocok.' : 'Belum ada data guru. Gunakan "Import Guru" untuk menambah banyak sekaligus.') + '</td></tr>'; return; }
+    tbody.innerHTML = data.map(function(g, i) {
+        return `<tr class="hover:bg-slate-50 group"><td class="py-2 px-3 text-slate-400">${i+1}</td><td class="py-2 px-3 font-mono font-bold text-indigo-600">${_esc(g.kode_guru)}</td><td class="py-2 px-3 font-semibold text-slate-800">${_esc(g.nama)}</td><td class="py-2 px-3 text-center"><div class="flex justify-center gap-1 opacity-0 group-hover:opacity-100"><button onclick="editGuruUI(${g.id},'${_esc(g.kode_guru)}','${_esc(g.nama)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button><button onclick="hapusGuruUI(${g.id},'${_esc(g.nama)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div></td></tr>`;
     }).join('');
     lucide.createIcons();
 }
@@ -1101,16 +1107,14 @@ function bukaModalGuru() {
     document.getElementById('modal-guru-title').textContent = 'Tambah Guru';
     document.getElementById('dm-guru-kode').value = '';
     document.getElementById('dm-guru-nama').value = '';
-    document.getElementById('dm-guru-mapel').value = '';
     document.getElementById('dm-guru-edit-id').value = '';
     document.getElementById('modal-dm-guru').classList.remove('hidden');
 }
 
-function editGuruUI(id, kode, nama, mapel) {
+function editGuruUI(id, kode, nama) {
     document.getElementById('modal-guru-title').textContent = 'Edit Guru';
     document.getElementById('dm-guru-kode').value = kode;
     document.getElementById('dm-guru-nama').value = nama;
-    document.getElementById('dm-guru-mapel').value = mapel;
     document.getElementById('dm-guru-edit-id').value = id;
     document.getElementById('modal-dm-guru').classList.remove('hidden');
 }
@@ -1118,20 +1122,161 @@ function editGuruUI(id, kode, nama, mapel) {
 async function simpanGuru() {
     const kode = document.getElementById('dm-guru-kode')?.value?.trim();
     const nama = document.getElementById('dm-guru-nama')?.value?.trim();
-    const mapel = document.getElementById('dm-guru-mapel')?.value?.trim();
     const editId = document.getElementById('dm-guru-edit-id')?.value;
     if (!kode || !nama) { alert('Kode dan Nama wajib diisi.'); return; }
 
     try {
         let res;
-        if (editId) { res = await editGuru(editId, kode, nama, mapel); }
-        else { res = await tambahGuru(kode, nama, mapel); }
+        if (editId) { res = await editGuru(editId, kode, nama); }
+        else { res = await tambahGuru(kode, nama); }
         if (res && !res.success) { alert(res.message); return; }
         document.getElementById('modal-dm-guru').classList.add('hidden');
         muatDmGuru();
     } catch (err) {
         alert('Error: ' + (err.message || err));
     }
+}
+
+// ── IMPORT MASSAL GURU (CSV/Excel) ──────────────────────────
+let _dmGuruImportPreview = [];
+
+function bukaImportGuru() {
+    _dmGuruImportPreview = [];
+    document.getElementById('import-guru-status').textContent = '';
+    document.getElementById('import-guru-preview-section')?.classList.add('hidden');
+    const inp = document.getElementById('import-guru-file');
+    if (inp) inp.value = '';
+    document.getElementById('modal-import-guru').classList.remove('hidden');
+    const dz = document.getElementById('import-guru-dropzone');
+    if (dz && !dz.dataset.bound) {
+        dz.dataset.bound = '1';
+        dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('border-indigo-400', 'bg-indigo-50'); });
+        dz.addEventListener('dragleave', () => dz.classList.remove('border-indigo-400', 'bg-indigo-50'));
+        dz.addEventListener('drop', e => {
+            e.preventDefault();
+            dz.classList.remove('border-indigo-400', 'bg-indigo-50');
+            if (e.dataTransfer.files[0]) _prosesFileGuru(e.dataTransfer.files[0]);
+        });
+    }
+    lucide.createIcons();
+}
+
+function _handleFileGuru(input) {
+    if (input.files[0]) _prosesFileGuru(input.files[0]);
+}
+
+function _prosesFileGuru(file) {
+    const statusEl = document.getElementById('import-guru-status');
+    if (statusEl) statusEl.textContent = 'Membaca file...';
+    const ext = file.name.split('.').pop().toLowerCase();
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let rows = [];
+            if (ext === 'csv') {
+                rows = e.target.result.split('\n').map(r => r.split(/[,;]/).map(c => c.trim().replace(/^"|"$/g, '')));
+            } else if (ext === 'xlsx' || ext === 'xls') {
+                if (typeof XLSX === 'undefined') { statusEl.innerHTML = '<span class="text-rose-600">Library Excel belum dimuat, refresh halaman.</span>'; return; }
+                const wb = XLSX.read(e.target.result, { type: 'binary' });
+                rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+            } else {
+                statusEl.innerHTML = '<span class="text-rose-600">Format tidak didukung. Gunakan CSV atau Excel.</span>';
+                return;
+            }
+            _previewImportGuru(rows);
+        } catch (err) {
+            statusEl.innerHTML = `<span class="text-rose-600">Error membaca file: ${err.message}</span>`;
+        }
+    };
+    if (ext === 'csv') reader.readAsText(file); else reader.readAsBinaryString(file);
+}
+
+function _previewImportGuru(rows) {
+    const statusEl = document.getElementById('import-guru-status');
+    if (!rows || rows.length === 0) { statusEl.innerHTML = '<span class="text-amber-600">File kosong.</span>'; return; }
+
+    // Deteksi header; jika baris pertama bukan header, ikut diproses sebagai data
+    const first = rows[0].map(h => String(h).toLowerCase().trim());
+    const punyaHeader = first.some(h => h.includes('kode') || h.includes('nama'));
+    let iKode = first.findIndex(h => h.includes('kode'));
+    let iNama = first.findIndex(h => h.includes('nama'));
+    if (iKode < 0) iKode = 0;
+    if (iNama < 0) iNama = 1;
+
+    const kodeAda = new Set(_dmGuruData.map(g => String(g.kode_guru || '').toLowerCase()));
+    const kodeDiFile = new Set();
+    _dmGuruImportPreview = [];
+    (punyaHeader ? rows.slice(1) : rows).forEach(row => {
+        const kode = String(row[iKode] || '').trim();
+        const nama = String(row[iNama] || '').trim();
+        if (!kode && !nama) return;
+        const k = kode.toLowerCase();
+        const dup = kodeAda.has(k) || kodeDiFile.has(k);
+        if (!dup) kodeDiFile.add(k);
+        _dmGuruImportPreview.push({ kode, nama, isDuplikat: dup, invalid: !kode || !nama });
+    });
+
+    const baru = _dmGuruImportPreview.filter(d => !d.isDuplikat && !d.invalid).length;
+    const dup = _dmGuruImportPreview.filter(d => d.isDuplikat).length;
+    const invalid = _dmGuruImportPreview.filter(d => d.invalid).length;
+    statusEl.innerHTML = `<span class="text-emerald-600 font-bold">${baru} guru baru</span>`
+        + (dup ? ` · <span class="text-amber-600 font-bold">${dup} duplikat (dilewati)</span>` : '')
+        + (invalid ? ` · <span class="text-rose-600 font-bold">${invalid} tidak lengkap (dilewati)</span>` : '');
+
+    document.getElementById('import-guru-preview-section')?.classList.remove('hidden');
+    const tbody = document.getElementById('import-guru-tbody');
+    if (tbody) {
+        tbody.innerHTML = _dmGuruImportPreview.slice(0, 300).map((d, i) => {
+            const cls = d.invalid ? 'bg-rose-50' : (d.isDuplikat ? 'bg-amber-50' : '');
+            const badge = d.invalid ? '<span class="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-lg">✕ Tak lengkap</span>'
+                : d.isDuplikat ? '<span class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">⚠ Duplikat</span>'
+                : '<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg">✓ Baru</span>';
+            return `<tr class="${cls}"><td class="py-1.5 px-3 text-center text-slate-400">${i+1}</td><td class="py-1.5 px-3 font-mono text-xs">${_esc(d.kode)}</td><td class="py-1.5 px-3 font-semibold text-sm">${_esc(d.nama)}</td><td class="py-1.5 px-3 text-center">${badge}</td></tr>`;
+        }).join('') + (_dmGuruImportPreview.length > 300 ? `<tr><td colspan="4" class="py-2 px-3 text-center text-[10px] text-slate-400 font-semibold">…dan ${_dmGuruImportPreview.length - 300} baris lain</td></tr>` : '');
+    }
+    const btn = document.getElementById('btn-konfirmasi-import-guru');
+    if (btn) btn.disabled = baru === 0;
+    lucide.createIcons();
+}
+
+async function konfirmasiImportGuru() {
+    const toImport = _dmGuruImportPreview.filter(d => !d.isDuplikat && !d.invalid);
+    if (toImport.length === 0) { alert('Tidak ada data guru baru untuk diimport.'); return; }
+    if (!confirm(`Import ${toImport.length} guru baru?`)) return;
+    const btn = document.getElementById('btn-konfirmasi-import-guru');
+    if (btn) { btn.disabled = true; btn.textContent = 'Mengimport...'; }
+    try {
+        // Kirim bertahap agar ratusan data tidak menabrak batas payload
+        let total = 0;
+        const errs = [];
+        for (let i = 0; i < toImport.length; i += 100) {
+            const res = await importDataGuruMassal(toImport.slice(i, i + 100));
+            total += res.berhasil;
+            if (res.errorList && res.errorList.length) errs.push(...res.errorList);
+        }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="upload" class="w-4 h-4 inline mr-1"></i>Import Sekarang'; }
+        if (total > 0) {
+            alert('✅ Berhasil mengimport ' + total + ' guru!');
+            document.getElementById('modal-import-guru').classList.add('hidden');
+            _dmGuruImportPreview = [];
+            muatDmGuru();
+        } else {
+            alert('Gagal import:\n' + errs.join('\n'));
+        }
+    } catch (err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Import Sekarang'; }
+        alert('Error: ' + (err.message || err));
+    }
+    lucide.createIcons();
+}
+
+function unduhTemplateGuru() {
+    const csv = 'kode_guru,nama_guru\nG001,Nama Guru Contoh\nG002,Nama Guru Lainnya\n';
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'template-import-guru.csv';
+    document.body.appendChild(a); a.click(); a.remove();
 }
 
 async function hapusGuruUI(id, nama) {
@@ -1172,17 +1317,17 @@ function renderDmWali() {
 function bukaModalWali() {
     document.getElementById('modal-wali-title').textContent = 'Tambah Wali Kelas';
     document.getElementById('dm-wali-kelas').value = '';
-    document.getElementById('dm-wali-nama').value = '';
     document.getElementById('dm-wali-edit-id').value = '';
     _populateKelasDropdownWali('');
+    _populateGuruDropdownWali('');
     document.getElementById('modal-dm-wali').classList.remove('hidden');
 }
 
 function editWaliUI(id, kelas, nama) {
     document.getElementById('modal-wali-title').textContent = 'Edit Wali Kelas';
-    document.getElementById('dm-wali-nama').value = nama;
     document.getElementById('dm-wali-edit-id').value = id;
     _populateKelasDropdownWali(kelas);
+    _populateGuruDropdownWali(nama);
     document.getElementById('modal-dm-wali').classList.remove('hidden');
 }
 
@@ -1196,6 +1341,33 @@ async function _populateKelasDropdownWali(selectedValue) {
         });
     } catch (err) {
         console.error('Gagal muat dropdown kelas:', err);
+    }
+}
+
+// Nama wali kelas dipilih dari Data Guru (bukan ketik manual)
+async function _populateGuruDropdownWali(selectedValue) {
+    const sel = document.getElementById('dm-wali-nama');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Memuat daftar guru...</option>';
+    try {
+        let guru = _dmGuruData;
+        if (!guru || guru.length === 0) { guru = await getDataGuru(); _dmGuruData = guru; }
+        if (!guru || guru.length === 0) {
+            sel.innerHTML = '<option value="">— Data guru masih kosong, import dulu di tab Guru —</option>';
+            return;
+        }
+        sel.innerHTML = '<option value="">— Pilih Guru —</option>';
+        guru.forEach(function(g) {
+            const nm = g.nama || g.nama_guru || '';
+            sel.innerHTML += `<option value="${_esc(nm)}" ${nm === selectedValue ? 'selected' : ''}>${_esc(nm)}${g.kode_guru ? ' (' + _esc(g.kode_guru) + ')' : ''}</option>`;
+        });
+        // Nama lama yang tidak ada di data guru tetap dipertahankan agar tidak hilang saat edit
+        if (selectedValue && !guru.some(g => (g.nama || g.nama_guru) === selectedValue)) {
+            sel.innerHTML += `<option value="${_esc(selectedValue)}" selected>${_esc(selectedValue)} (tidak ada di data guru)</option>`;
+        }
+    } catch (err) {
+        sel.innerHTML = '<option value="">Gagal memuat daftar guru</option>';
+        console.error('Gagal muat dropdown guru:', err);
     }
 }
 

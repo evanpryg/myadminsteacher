@@ -242,25 +242,42 @@ async function buatSemesterBaru(ta, sem, opsi) {
 }
 
 // ── GURU & WALI KELAS ───────────────────────────────────────
+// Kolom asli tabel data_guru: id, kode_guru, nama_guru (mapel tidak dipakai).
 async function getDataGuru() {
-    return await fetchSupabase("/rest/v1/data_guru?order=nama", "GET") || [];
+    const data = await fetchSupabase("/rest/v1/data_guru?select=id,kode_guru,nama_guru&order=nama_guru", "GET") || [];
+    // Normalisasi: sediakan .nama agar pemakai lama tetap jalan
+    return data.map(g => ({ ...g, nama: g.nama_guru }));
 }
 
-async function tambahGuru(kode, nama, mapel) {
-    const res = await fetchSupabase("/rest/v1/data_guru", "POST", { kode_guru: kode, nama, mata_pelajaran: mapel });
+async function tambahGuru(kode, nama) {
+    const res = await fetchSupabase("/rest/v1/data_guru", "POST", { kode_guru: kode, nama_guru: nama });
     if (res) return { success: true };
-    return { success: false, message: 'Gagal menambah guru.' };
+    return { success: false, message: 'Gagal menambah guru: ' + (_lastSupabaseError || 'unknown') };
 }
 
-async function editGuru(id, kode, nama, mapel) {
-    const res = await fetchSupabase("/rest/v1/data_guru?id=eq." + id, "PATCH", { kode_guru: kode, nama, mata_pelajaran: mapel });
+async function editGuru(id, kode, nama) {
+    const res = await fetchSupabase("/rest/v1/data_guru?id=eq." + id, "PATCH", { kode_guru: kode, nama_guru: nama });
     if (res !== null) return { success: true };
-    return { success: false, message: 'Gagal mengupdate guru.' };
+    return { success: false, message: 'Gagal mengupdate guru: ' + (_lastSupabaseError || 'unknown') };
 }
 
 async function hapusGuru(id) {
     await fetchSupabase("/rest/v1/data_guru?id=eq." + id, "DELETE");
     return { success: true };
+}
+
+// Import massal guru (dipakai fitur import CSV/Excel di Data Master)
+async function importDataGuruMassal(dataArray) {
+    if (!dataArray || dataArray.length === 0) return { berhasil: 0, errorList: [] };
+    const payload = dataArray.map(d => ({
+        kode_guru: String(d.kode || '').trim(),
+        nama_guru: String(d.nama || '').trim()
+    }));
+    const res = await fetchSupabase("/rest/v1/data_guru", "POST", payload, {
+        "Prefer": "return=representation,resolution=merge-duplicates"
+    });
+    if (res) return { berhasil: payload.length, errorList: [] };
+    return { berhasil: 0, errorList: ['Gagal upload massal: ' + (_lastSupabaseError || 'unknown')] };
 }
 
 async function getDataWaliKelas() {
