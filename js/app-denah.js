@@ -164,21 +164,22 @@ function renderDenah() {
     if (!g.lantai || g.lantai.length === 0) g.lantai = [{ no: 1, sisi: [] }];
     if (_denahL >= g.lantai.length) _denahL = 0;
 
-    // Toolbar: pilih gedung, lantai, mode
+    // Toolbar: pilih gedung + aksi. Lantai TIDAK dipilih di mode lihat
+    // (semua lantai tergambar bertumpuk sekaligus), hanya saat mengelola.
     if (toolbar) {
         const tabGedung = _denah.gedung.map((gd, i) =>
             `<button onclick="denahPilihGedung(${i})" class="px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${i === _denahG ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${_esc(gd.nama)}</button>`).join('');
         const chipLantai = g.lantai.map((lt, i) =>
             `<button onclick="denahPilihLantai(${i})" class="w-9 h-9 text-xs font-black rounded-xl transition-all ${i === _denahL ? 'bg-slate-800 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-500 hover:border-indigo-300'}">${_esc(lt.no)}</button>`).join('');
         toolbar.innerHTML = `
-        <div class="bg-white rounded-2xl border border-slate-200 p-3 flex items-center justify-between gap-3 flex-wrap">
+        <div class="bg-white rounded-2xl border border-slate-200 p-3 flex items-center justify-between gap-3 flex-wrap no-print">
             <div class="flex items-center gap-3 flex-wrap">
                 <div class="flex items-center gap-1 bg-slate-50 p-1 rounded-xl">${tabGedung}</div>
-                <div class="flex items-center gap-1.5">
-                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Lantai</span>
+                ${_denahMode === 'edit' ? `<div class="flex items-center gap-1.5">
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Kelola Lantai</span>
                     ${chipLantai}
-                    ${_denahMode === 'edit' ? `<button onclick="denahTambahLantai()" title="Tambah lantai" class="w-9 h-9 rounded-xl border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-400"><i data-lucide="plus" class="w-4 h-4 mx-auto"></i></button>` : ''}
-                </div>
+                    <button onclick="denahTambahLantai()" title="Tambah lantai" class="w-9 h-9 rounded-xl border border-dashed border-slate-300 text-slate-400 hover:text-indigo-600 hover:border-indigo-400"><i data-lucide="plus" class="w-4 h-4 mx-auto"></i></button>
+                </div>` : ''}
             </div>
             <div class="flex items-center gap-2 flex-wrap">
                 ${_denahBelumSimpan ? '<span class="text-[10px] font-bold text-amber-600">⚠ Belum disimpan</span>' : ''}
@@ -186,12 +187,14 @@ function renderDenah() {
                     ? `<button onclick="denahSalinLantai()" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 px-3 py-2 rounded-xl"><i data-lucide="copy" class="w-3.5 h-3.5"></i>Salin dari Lantai Lain</button>
                        <button id="denah-btn-simpan" onclick="simpanDenah()" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm"><i data-lucide="save" class="w-3.5 h-3.5"></i>Simpan</button>
                        <button onclick="denahSetMode('lihat')" class="text-xs font-bold text-slate-500 hover:bg-slate-100 px-3 py-2 rounded-xl border">Selesai</button>`
-                    : `<button onclick="denahSetMode('edit')" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm"><i data-lucide="pencil" class="w-3.5 h-3.5"></i>Kelola Denah</button>`}
+                    : `<button onclick="cetakDenah()" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 px-3 py-2 rounded-xl"><i data-lucide="printer" class="w-3.5 h-3.5"></i>Cetak / PDF</button>
+                       <button id="denah-btn-png" onclick="unduhDenahPNG()" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 px-3 py-2 rounded-xl"><i data-lucide="image-down" class="w-3.5 h-3.5"></i>Unduh Gambar</button>
+                       <button onclick="denahSetMode('edit')" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm"><i data-lucide="pencil" class="w-3.5 h-3.5"></i>Kelola Denah</button>`}
             </div>
         </div>`;
     }
 
-    canvas.innerHTML = _denahGambar(_lAktif());
+    canvas.innerHTML = _denahGambarGedung(g);
     if (editor) editor.innerHTML = _denahMode === 'edit' ? _denahPanelEditor(_lAktif()) : '';
     lucide.createIcons();
 }
@@ -200,73 +203,155 @@ function denahPilihGedung(i) { _denahG = i; _denahL = 0; renderDenah(); }
 function denahPilihLantai(i) { _denahL = i; renderDenah(); }
 function denahSetMode(m) { _denahMode = m; renderDenah(); }
 
-// ── Menggambar denah ────────────────────────────────────────
-function _denahBlok(it, si, ii, vertikal) {
+// ── Menggambar denah (SEMUA lantai bertumpuk sekaligus) ─────
+// Aturan tumpukan: lantai 1 selalu paling DEKAT halaman, lantai
+// berikutnya menjauh. Jadi guru langsung melihat seluruh gedung
+// tanpa perlu mengeklik tombol lantai satu per satu.
+function _denahBlok(it, li, si, ii, vertikal) {
     if (it.t === 'tangga') {
-        const gaya = vertikal ? 'height:44px;flex:0 0 auto;' : 'width:52px;flex:0 0 auto;';
+        const gaya = vertikal ? 'height:38px;flex:0 0 auto;' : 'width:42px;flex:0 0 auto;';
         return `<div style="${gaya}" title="${_esc(it.nama || 'Tangga')}"
-            class="rounded-lg border border-slate-300 bg-[repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0_4px,#f8fafc_4px,#f8fafc_8px)] flex flex-col items-center justify-center text-slate-500">
-            <i data-lucide="stairs" class="w-3.5 h-3.5"></i>
-            <span class="text-[8px] font-black uppercase leading-none mt-0.5">Tangga</span>
+            class="rounded-md border border-dashed border-slate-400 bg-slate-200 flex flex-col items-center justify-center text-slate-500">
+            <i data-lucide="chevrons-up" class="w-3 h-3"></i>
+            <span class="text-[7px] font-black uppercase leading-none">Tangga</span>
         </div>`;
     }
     const j = DENAH_JENIS[it.jenis] || DENAH_JENIS.fasilitas;
     const u = Math.max(1, Math.min(4, parseInt(it.ukuran, 10) || 2));
-    const gaya = vertikal ? `flex:${u} 1 0;min-height:${34 + u * 12}px;` : `flex:${u} 1 0;min-width:${44 + u * 16}px;`;
+    const gaya = vertikal ? `flex:${u} 1 0;min-height:${30 + u * 10}px;` : `flex:${u} 1 0;min-width:${40 + u * 14}px;`;
     const kelas = _denahKelasInfo[String(it.nama || '').toLowerCase().trim()];
-    return `<div onclick="denahKlikRuang(${si},${ii})" style="${gaya}"
-        class="rounded-lg border ${j.cls} px-1.5 py-1.5 cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all flex flex-col items-center justify-center text-center overflow-hidden">
-        <span class="text-[11px] font-black leading-tight truncate w-full">${_esc(it.nama || '—')}</span>
-        ${kelas ? `<span class="text-[8px] font-bold opacity-70 leading-none mt-0.5">${kelas.total_siswa} siswa</span>` : ''}
+    return `<div onclick="denahKlikRuang(${li},${si},${ii})" style="${gaya}"
+        class="rounded-md border ${j.cls} px-1 py-1 cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all flex flex-col items-center justify-center text-center overflow-hidden">
+        <span class="text-[10px] font-black leading-tight truncate w-full">${_esc(it.nama || '—')}</span>
+        ${kelas ? `<span class="text-[7px] font-bold opacity-70 leading-none">${kelas.total_siswa} siswa</span>` : ''}
     </div>`;
 }
 
-function _denahSisiHtml(sisi, si) {
-    const vertikal = sisi.posisi === 'kiri' || sisi.posisi === 'kanan';
-    const isi = (sisi.items || []).map((it, ii) => _denahBlok(it, si, ii, vertikal)).join('');
-    const arah = vertikal ? 'flex-col' : 'flex-row';
-    return `<div class="bg-slate-50 border border-slate-200 rounded-xl p-1.5 h-full">
-        <p class="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1 px-0.5 truncate">${_esc(sisi.nama)}</p>
-        <div class="flex ${arah} gap-1 ${vertikal ? 'h-[calc(100%-14px)]' : ''}">${isi || '<span class="text-[9px] text-slate-400 px-1">kosong</span>'}</div>
+// Satu strip = satu sisi pada satu lantai
+function _denahStrip(s, si, li, no, vertikal, disorot) {
+    const isi = (s.items || []).map((it, ii) => _denahBlok(it, li, si, ii, vertikal)).join('')
+        || '<span class="text-[9px] text-slate-400 px-1 self-center">kosong</span>';
+    const sorot = disorot ? 'ring-2 ring-indigo-400' : '';
+    const badge = `<span class="shrink-0 text-[9px] font-black text-white bg-slate-600 rounded px-1.5 py-0.5">L${_esc(no)}</span>`;
+    if (vertikal) {
+        return `<div class="bg-slate-50 border border-slate-200 rounded-lg p-1 flex flex-col gap-1 ${sorot}" style="width:94px">
+            <div class="flex justify-center">${badge}</div>
+            <div class="flex flex-col gap-1 flex-1">${isi}</div>
+        </div>`;
+    }
+    return `<div class="bg-slate-50 border border-slate-200 rounded-lg p-1 flex items-stretch gap-1.5 ${sorot}">
+        <div class="flex items-center shrink-0">${badge}</div>
+        <div class="flex flex-row gap-1 flex-1">${isi}</div>
     </div>`;
 }
 
-function _denahGambar(lantai) {
-    if (!lantai) return '';
-    const sisi = lantai.sisi || [];
-    const cari = (p) => sisi.map((s, i) => ({ s, i })).filter(x => x.s.posisi === p);
-    const blokPosisi = (p) => cari(p).map(x => _denahSisiHtml(x.s, x.i)).join('');
+function _denahGambarGedung(g) {
+    const lantai = g.lantai || [];
+    const punya = (p) => lantai.some(l => (l.sisi || []).some(s => s.posisi === p));
 
-    const atas = blokPosisi('atas'), bawah = blokPosisi('bawah');
-    const kiri = blokPosisi('kiri'), kanan = blokPosisi('kanan');
-    const adaKiri = kiri !== '', adaKanan = kanan !== '';
+    // Susun strip per posisi. Lantai 1 harus paling dekat halaman:
+    // atas & kiri -> urutan dibalik (lantai tertinggi lebih dulu),
+    // bawah & kanan -> urutan normal.
+    const blokPosisi = (p) => {
+        const vertikal = (p === 'kiri' || p === 'kanan');
+        let urut = lantai.map((l, i) => ({ l, i }));
+        if (p === 'atas' || p === 'kiri') urut = urut.slice().reverse();
+        return urut.map(({ l, i }) => (l.sisi || [])
+            .map((s, si) => ({ s, si }))
+            .filter(x => x.s.posisi === p)
+            .map(x => _denahStrip(x.s, x.si, i, l.no, vertikal, _denahMode === 'edit' && i === _denahL))
+            .join('')
+        ).join('');
+    };
 
-    const kolom = (adaKiri ? '150px ' : '') + '1fr' + (adaKanan ? ' 150px' : '');
-    const spanPenuh = 1 + (adaKiri ? 1 : 0) + (adaKanan ? 1 : 0);
+    const namaSisi = (p) => {
+        for (const l of lantai) for (const s of (l.sisi || [])) if (s.posisi === p) return s.nama;
+        return '';
+    };
+    const judulBlok = (p) => `<p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">${_esc(namaSisi(p))}</p>`;
 
-    return `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-x-auto">
+    const atas = punya('atas'), bawah = punya('bawah'), kiri = punya('kiri'), kanan = punya('kanan');
+    const nKiri = kiri ? lantai.length : 0, nKanan = kanan ? lantai.length : 0;
+    const kolom = (kiri ? (nKiri * 98) + 'px ' : '') + 'minmax(200px,1fr)' + (kanan ? ' ' + (nKanan * 98) + 'px' : '');
+    const spanPenuh = 1 + (kiri ? 1 : 0) + (kanan ? 1 : 0);
+    const lebarMin = (kiri ? nKiri * 98 : 0) + (kanan ? nKanan * 98 : 0) + 260;
+
+    return `<div id="denah-print-area" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-x-auto">
         <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <p class="text-xs font-black text-slate-700">${_esc(_gAktif().nama)} · Lantai ${_esc(lantai.no)}</p>
+            <div>
+                <p class="text-sm font-black text-slate-800">Denah ${_esc(g.nama)}</p>
+                <p class="text-[10px] text-slate-400 font-semibold">Seluruh ${lantai.length} lantai · <b>L1 = baris paling dekat halaman</b>, lantai berikutnya menjauh</p>
+            </div>
             <div class="flex items-center gap-3 flex-wrap">
                 <span class="flex items-center gap-1 text-[9px] font-bold text-slate-400"><i data-lucide="compass" class="w-3.5 h-3.5"></i>Atas = Utara</span>
                 ${Object.keys(DENAH_JENIS).map(k => `<span class="flex items-center gap-1 text-[9px] font-bold text-slate-500"><span class="w-2.5 h-2.5 rounded border ${DENAH_JENIS[k].cls}"></span>${DENAH_JENIS[k].label}</span>`).join('')}
             </div>
         </div>
-        <div class="min-w-[640px] grid gap-2" style="grid-template-columns:${kolom};">
-            ${atas ? `<div style="grid-column:span ${spanPenuh};" class="space-y-2">${atas}</div>` : ''}
-            ${adaKiri ? `<div class="space-y-2">${kiri}</div>` : ''}
-            <div class="border-2 border-dashed border-slate-200 rounded-xl min-h-[110px] flex items-center justify-center">
-                <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Halaman / Void</span>
+        <div class="grid gap-2" style="grid-template-columns:${kolom};min-width:${lebarMin}px;">
+            ${atas ? `<div style="grid-column:span ${spanPenuh};">${judulBlok('atas')}<div class="space-y-1">${blokPosisi('atas')}</div></div>` : ''}
+            ${kiri ? `<div>${judulBlok('kiri')}<div class="flex gap-1 items-stretch">${blokPosisi('kiri')}</div></div>` : ''}
+            <div class="border-2 border-dashed border-slate-200 rounded-xl min-h-[120px] flex items-center justify-center">
+                <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Halaman</span>
             </div>
-            ${adaKanan ? `<div class="space-y-2">${kanan}</div>` : ''}
-            ${bawah ? `<div style="grid-column:span ${spanPenuh};" class="space-y-2">${bawah}</div>` : ''}
+            ${kanan ? `<div>${judulBlok('kanan')}<div class="flex gap-1 items-stretch">${blokPosisi('kanan')}</div></div>` : ''}
+            ${bawah ? `<div style="grid-column:span ${spanPenuh};">${judulBlok('bawah')}<div class="space-y-1">${blokPosisi('bawah')}</div></div>` : ''}
         </div>
     </div>`;
 }
 
+// ── Cetak & unduh ───────────────────────────────────────────
+function cetakDenah() {
+    document.body.classList.add('mode-cetak-denah');
+    window.print();
+    setTimeout(() => document.body.classList.remove('mode-cetak-denah'), 800);
+}
+
+async function unduhDenahPNG() {
+    const btn = document.getElementById('denah-btn-png');
+    const el = document.getElementById('denah-print-area');
+    if (!el) return;
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Menyiapkan...'; }
+    try {
+        if (typeof html2canvas === 'undefined') {
+            await new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
+                s.onload = res;
+                s.onerror = () => rej(new Error('Gagal memuat library gambar. Periksa koneksi internet.'));
+                document.head.appendChild(s);
+            });
+        }
+        // Denah lebih lebar dari layar -> lebarkan sementara supaya
+        // tangkapan gambar utuh (tidak terpotong di sisi kanan).
+        const simpan = { overflow: el.style.overflow, width: el.style.width };
+        const lebarPenuh = Math.max(el.scrollWidth, el.querySelector('.grid') ? el.querySelector('.grid').scrollWidth + 34 : 0);
+        el.style.overflow = 'visible';
+        el.style.width = lebarPenuh + 'px';
+        const canvas = await html2canvas(el, {
+            backgroundColor: '#ffffff', scale: 2,
+            width: lebarPenuh, height: el.scrollHeight,
+            windowWidth: lebarPenuh + 120
+        });
+        el.style.overflow = simpan.overflow;
+        el.style.width = simpan.width;
+        canvas.toBlob(function (blob) {
+            const nama = 'Denah-' + String(_gAktif().nama).replace(/[\\/:*?"<>|\s]+/g, '-') + '.png';
+            if (typeof lpDownloadBlob === 'function') lpDownloadBlob(blob, nama);
+            else {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob); a.download = nama;
+                document.body.appendChild(a); a.click(); a.remove();
+            }
+        });
+    } catch (err) {
+        alert('Gagal membuat gambar: ' + (err.message || err) + '\n\nAlternatif: gunakan tombol "Cetak / PDF" lalu pilih "Save as PDF".');
+    }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="image-down" class="w-3.5 h-3.5"></i>Unduh Gambar'; lucide.createIcons(); }
+}
+
 // ── Klik ruangan -> info ────────────────────────────────────
-function denahKlikRuang(si, ii) {
-    const lantai = _lAktif();
+function denahKlikRuang(li, si, ii) {
+    const lantai = _gAktif().lantai[li];
     const it = lantai.sisi[si].items[ii];
     const info = document.getElementById('denah-info');
     if (!info || !it) return;
