@@ -219,7 +219,10 @@ function _denahBlok(it, li, si, ii, vertikal) {
     }
     const j = DENAH_JENIS[it.jenis] || DENAH_JENIS.fasilitas;
     const u = Math.max(1, Math.min(4, parseInt(it.ukuran, 10) || 2));
-    const gaya = vertikal ? `flex:${u} 1 0;min-height:${30 + u * 10}px;` : `flex:${u} 1 0;min-width:${40 + u * 14}px;`;
+    // Ukuran diatur oleh sel segmen (px tetap), blok cukup mengisi
+    // proporsional -> ruangan berukuran sama tampil sama besar,
+    // baik di sayap mendatar maupun sayap tegak.
+    const gaya = `flex:${u} 1 0;min-width:0;min-height:0;`;
     const kelas = _denahKelasInfo[String(it.nama || '').toLowerCase().trim()];
     return `<div onclick="denahKlikRuang(${li},${si},${ii})" style="${gaya}"
         class="rounded-md border ${j.cls} px-1 py-1 cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all flex flex-col items-center justify-center text-center overflow-hidden">
@@ -234,9 +237,9 @@ function _denahBlok(it, li, si, ii, vertikal) {
 // pecah tiap sisi jadi segmen (dipisah tangga), lalu semua lantai
 // memakai template grid yang SAMA — lebar tiap segmen diambil dari
 // lantai yang paling "berat", sehingga kolom tangga selalu lurus.
-const DENAH_TANGGA_PX = 44;
-const DENAH_UNIT_X = 36;   // lebar minimum per satuan ukuran (sayap mendatar)
-const DENAH_UNIT_Y = 26;   // tinggi minimum per satuan ukuran (sayap tegak)
+const DENAH_TANGGA_PX = 44;   // panjang kolom/baris tangga
+const DENAH_DEPTH = 74;       // ketebalan bangunan (seragam utk semua sayap)
+const DENAH_UNIT = 44;        // panjang per satuan ukuran ruangan (seragam)
 
 function _pecahSegmen(items) {
     const segs = [{ items: [] }];
@@ -266,15 +269,15 @@ function _denahTemplate(lantai, p) {
         isi.forEach(x => { const w = _bobotSegmen(x.segs[k]); if (w > m) m = w; });
         bobot.push(m || 1);
     }
+    // Ukuran segmen dalam PIKSEL TETAP (bukan fr) supaya ruangan
+    // berukuran sama selalu tampil sama besar; kalau jumlah ruangan
+    // antar lantai tidak sama, hanya lantai yg lebih sedikit itu yang
+    // ruangannya melebar mengisi segmen.
     const kol = [];
-    bobot.forEach((b, k) => { if (k > 0) kol.push(DENAH_TANGGA_PX + 'px'); kol.push(b + 'fr'); });
+    bobot.forEach((b, k) => { if (k > 0) kol.push(DENAH_TANGGA_PX + 'px'); kol.push((b * DENAH_UNIT) + 'px'); });
     const total = bobot.reduce((a, b) => a + b, 0);
-    return {
-        nSeg: nSeg,
-        template: kol.join(' '),
-        minX: total * DENAH_UNIT_X + (nSeg - 1) * DENAH_TANGGA_PX + nSeg * 8,
-        minY: total * DENAH_UNIT_Y + (nSeg - 1) * 38 + nSeg * 8
-    };
+    const panjang = total * DENAH_UNIT + (nSeg - 1) * DENAH_TANGGA_PX + (nSeg * 2 - 1) * 4;
+    return { nSeg: nSeg, template: kol.join(' '), panjang: panjang };
 }
 
 // Satu strip = satu sisi pada satu lantai, memakai template bersama
@@ -287,21 +290,21 @@ function _denahStrip(s, si, li, no, vertikal, tpl, disorot) {
             sel.push(t ? _denahBlok(t.it, li, si, t.ii, vertikal) : '<div></div>');
         }
         const seg = pecah.segs[k];
-        sel.push(`<div class="flex ${vertikal ? 'flex-col' : 'flex-row'} gap-1">${
+        sel.push(`<div class="flex ${vertikal ? 'flex-col w-full h-full' : 'flex-row h-full'} gap-1">${
             seg && seg.items.length ? seg.items.map(x => _denahBlok(x.it, li, si, x.ii, vertikal)).join('') : ''
         }</div>`);
     }
     const sorot = disorot ? 'ring-2 ring-indigo-400' : '';
     const badge = `<span class="text-[9px] font-black text-white bg-slate-600 rounded px-1.5 py-0.5">L${_esc(no)}</span>`;
     if (vertikal) {
-        return `<div class="bg-slate-50 border border-slate-200 rounded-lg p-1 flex flex-col gap-1 ${sorot}" style="width:94px">
+        return `<div class="bg-slate-50 border border-slate-200 rounded-lg p-1 flex flex-col gap-1 ${sorot}" style="width:${DENAH_DEPTH + 10}px">
             <div class="flex justify-center">${badge}</div>
-            <div class="grid gap-1 flex-1" style="grid-template-rows:${tpl.template};min-height:${tpl.minY}px;">${sel.join('')}</div>
+            <div class="grid gap-1" style="grid-template-rows:${tpl.template};height:${tpl.panjang}px;">${sel.join('')}</div>
         </div>`;
     }
-    return `<div class="bg-slate-50 border border-slate-200 rounded-lg p-1 flex items-stretch gap-1.5 ${sorot}">
-        <div class="flex items-center justify-center shrink-0" style="width:26px">${badge}</div>
-        <div class="grid gap-1 flex-1" style="grid-template-columns:${tpl.template};min-width:${tpl.minX}px;">${sel.join('')}</div>
+    return `<div class="bg-slate-50 border border-slate-200 rounded-lg p-1 flex items-stretch gap-1.5 ${sorot}" style="width:max-content;height:${DENAH_DEPTH + 10}px">
+        <div class="flex items-center justify-center shrink-0" style="width:24px">${badge}</div>
+        <div class="grid gap-1" style="grid-template-columns:${tpl.template};width:${tpl.panjang}px;">${sel.join('')}</div>
     </div>`;
 }
 
@@ -339,11 +342,11 @@ function _denahGambarGedung(g) {
 
     const atas = punya('atas'), bawah = punya('bawah'), kiri = punya('kiri'), kanan = punya('kanan');
     const nL = lantai.length || 1;
-    const lebarSisi = nL * 98;
+    const lebarSisi = nL * (DENAH_DEPTH + 14);
     // Kolom tengah HARUS selebar isinya (max-content), kalau tidak sayap
     // selatan melimpah menabrak sayap samping.
     const kolom = (kiri ? lebarSisi + 'px ' : '') + 'minmax(max-content,1fr)' + (kanan ? ' ' + lebarSisi + 'px' : '');
-    const lebarTengah = Math.max(300, (atas ? tpl.atas.minX : 0), (bawah ? tpl.bawah.minX : 0)) + 40;
+    const lebarTengah = Math.max(280, (atas ? tpl.atas.panjang : 0), (bawah ? tpl.bawah.panjang : 0)) + 44;
     const lebarMin = (kiri ? lebarSisi : 0) + (kanan ? lebarSisi : 0) + lebarTengah;
     const sudutKosong = '<div></div>';
 
@@ -386,6 +389,7 @@ async function unduhDenahPNG() {
     const el = document.getElementById('denah-print-area');
     if (!el) return;
     if (btn) { btn.disabled = true; btn.innerHTML = 'Menyiapkan...'; }
+    let bungkus = null;
     try {
         if (typeof html2canvas === 'undefined') {
             await new Promise((res, rej) => {
@@ -396,20 +400,32 @@ async function unduhDenahPNG() {
                 document.head.appendChild(s);
             });
         }
-        // Denah lebih lebar dari layar -> lebarkan sementara supaya
-        // tangkapan gambar utuh (tidak terpotong di sisi kanan).
-        const simpan = { overflow: el.style.overflow, width: el.style.width };
-        const lebarGrid = [...el.querySelectorAll('.grid')].reduce((m, gr) => Math.max(m, gr.scrollWidth), 0);
-        const lebarPenuh = Math.max(el.scrollWidth, lebarGrid + 34);
-        el.style.overflow = 'visible';
-        el.style.width = lebarPenuh + 'px';
-        const canvas = await html2canvas(el, {
+        // Denah biasanya lebih lebar dari layar dan di dalam kotak
+        // ber-scroll, sehingga tangkapan langsung selalu terpotong.
+        // Solusi: KLONING ke wadah di luar layar dgn lebar penuh,
+        // lalu tangkap wadah itu.
+        const lebarIsi = [...el.querySelectorAll('.grid')].reduce((m, gr) =>
+            Math.max(m, gr.scrollWidth, gr.getBoundingClientRect().width), 0);
+        const lebar = Math.ceil(Math.max(el.scrollWidth, lebarIsi + 36)) + 4;
+
+        bungkus = document.createElement('div');
+        bungkus.style.cssText = 'position:absolute;left:-99999px;top:0;z-index:-1;background:#ffffff;width:' + lebar + 'px;';
+        const klon = el.cloneNode(true);
+        klon.removeAttribute('id');
+        klon.style.width = lebar + 'px';
+        klon.style.maxWidth = 'none';
+        klon.style.overflow = 'visible';
+        klon.style.boxShadow = 'none';
+        bungkus.appendChild(klon);
+        document.body.appendChild(bungkus);
+        // beri waktu layout menghitung ulang
+        await new Promise(r => setTimeout(r, 60));
+
+        const canvas = await html2canvas(bungkus, {
             backgroundColor: '#ffffff', scale: 2,
-            width: lebarPenuh, height: el.scrollHeight,
-            windowWidth: lebarPenuh + 120
+            width: bungkus.scrollWidth, height: bungkus.scrollHeight,
+            windowWidth: lebar + 200, scrollX: 0, scrollY: 0
         });
-        el.style.overflow = simpan.overflow;
-        el.style.width = simpan.width;
         canvas.toBlob(function (blob) {
             const nama = 'Denah-' + String(_gAktif().nama).replace(/[\\/:*?"<>|\s]+/g, '-') + '.png';
             if (typeof lpDownloadBlob === 'function') lpDownloadBlob(blob, nama);
@@ -421,6 +437,8 @@ async function unduhDenahPNG() {
         });
     } catch (err) {
         alert('Gagal membuat gambar: ' + (err.message || err) + '\n\nAlternatif: gunakan tombol "Cetak / PDF" lalu pilih "Save as PDF".');
+    } finally {
+        if (bungkus && bungkus.parentNode) bungkus.parentNode.removeChild(bungkus);
     }
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="image-down" class="w-3.5 h-3.5"></i>Unduh Gambar'; lucide.createIcons(); }
 }
