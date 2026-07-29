@@ -245,13 +245,16 @@ function _denahStrip(s, si, li, no, vertikal, disorot) {
     </div>`;
 }
 
+// Denah gabungan: SEMUA lantai dalam satu gambar.
+// Sayap selatan hanya membentang di kolom TENGAH, sedangkan sayap
+// timur & barat direnggangkan ke samping — sehingga sudut antara
+// tengah dgn timur/barat dibiarkan KOSONG dan sayap samping tidak
+// lagi tampak menutupi muka gedung selatan.
 function _denahGambarGedung(g) {
     const lantai = g.lantai || [];
     const punya = (p) => lantai.some(l => (l.sisi || []).some(s => s.posisi === p));
 
-    // Susun strip per posisi. Lantai 1 harus paling dekat halaman:
-    // atas & kiri -> urutan dibalik (lantai tertinggi lebih dulu),
-    // bawah & kanan -> urutan normal.
+    // Lantai 1 paling dekat halaman: atas & kiri dibalik, bawah & kanan normal
     const blokPosisi = (p) => {
         const vertikal = (p === 'kiri' || p === 'kanan');
         let urut = lantai.map((l, i) => ({ l, i }));
@@ -268,13 +271,16 @@ function _denahGambarGedung(g) {
         for (const l of lantai) for (const s of (l.sisi || [])) if (s.posisi === p) return s.nama;
         return '';
     };
-    const judulBlok = (p) => `<p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">${_esc(namaSisi(p))}</p>`;
+    const judulBlok = (p) => `<p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1 truncate">${_esc(namaSisi(p))}</p>`;
 
     const atas = punya('atas'), bawah = punya('bawah'), kiri = punya('kiri'), kanan = punya('kanan');
-    const nKiri = kiri ? lantai.length : 0, nKanan = kanan ? lantai.length : 0;
-    const kolom = (kiri ? (nKiri * 98) + 'px ' : '') + 'minmax(200px,1fr)' + (kanan ? ' ' + (nKanan * 98) + 'px' : '');
-    const spanPenuh = 1 + (kiri ? 1 : 0) + (kanan ? 1 : 0);
-    const lebarMin = (kiri ? nKiri * 98 : 0) + (kanan ? nKanan * 98 : 0) + 260;
+    const nL = lantai.length || 1;
+    const lebarSisi = nL * 98;
+    // Kolom tengah HARUS selebar isinya (max-content), kalau tidak sayap
+    // selatan melimpah menabrak sayap samping.
+    const kolom = (kiri ? lebarSisi + 'px ' : '') + 'minmax(max-content,1fr)' + (kanan ? ' ' + lebarSisi + 'px' : '');
+    const lebarMin = (kiri ? lebarSisi : 0) + (kanan ? lebarSisi : 0) + 300;
+    const sudutKosong = '<div></div>';
 
     return `<div id="denah-print-area" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-x-auto">
         <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -287,14 +293,18 @@ function _denahGambarGedung(g) {
                 ${Object.keys(DENAH_JENIS).map(k => `<span class="flex items-center gap-1 text-[9px] font-bold text-slate-500"><span class="w-2.5 h-2.5 rounded border ${DENAH_JENIS[k].cls}"></span>${DENAH_JENIS[k].label}</span>`).join('')}
             </div>
         </div>
-        <div class="grid gap-2" style="grid-template-columns:${kolom};min-width:${lebarMin}px;">
-            ${atas ? `<div style="grid-column:span ${spanPenuh};">${judulBlok('atas')}<div class="space-y-1">${blokPosisi('atas')}</div></div>` : ''}
+        <div class="grid gap-y-4" style="grid-template-columns:${kolom};column-gap:28px;min-width:${lebarMin}px;">
+            ${atas ? `${kiri ? sudutKosong : ''}
+                      <div>${judulBlok('atas')}<div class="space-y-1">${blokPosisi('atas')}</div></div>
+                      ${kanan ? sudutKosong : ''}` : ''}
             ${kiri ? `<div>${judulBlok('kiri')}<div class="flex gap-1 items-stretch">${blokPosisi('kiri')}</div></div>` : ''}
-            <div class="border-2 border-dashed border-slate-200 rounded-xl min-h-[120px] flex items-center justify-center">
-                <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Halaman</span>
+            <div class="border-2 border-dashed border-slate-200 rounded-xl min-h-[140px] flex items-center justify-center">
+                <span class="text-[11px] font-black text-slate-300 uppercase tracking-widest">Halaman</span>
             </div>
             ${kanan ? `<div>${judulBlok('kanan')}<div class="flex gap-1 items-stretch">${blokPosisi('kanan')}</div></div>` : ''}
-            ${bawah ? `<div style="grid-column:span ${spanPenuh};">${judulBlok('bawah')}<div class="space-y-1">${blokPosisi('bawah')}</div></div>` : ''}
+            ${bawah ? `${kiri ? sudutKosong : ''}
+                       <div>${judulBlok('bawah')}<div class="space-y-1">${blokPosisi('bawah')}</div></div>
+                       ${kanan ? sudutKosong : ''}` : ''}
         </div>
     </div>`;
 }
@@ -324,7 +334,8 @@ async function unduhDenahPNG() {
         // Denah lebih lebar dari layar -> lebarkan sementara supaya
         // tangkapan gambar utuh (tidak terpotong di sisi kanan).
         const simpan = { overflow: el.style.overflow, width: el.style.width };
-        const lebarPenuh = Math.max(el.scrollWidth, el.querySelector('.grid') ? el.querySelector('.grid').scrollWidth + 34 : 0);
+        const lebarGrid = [...el.querySelectorAll('.grid')].reduce((m, gr) => Math.max(m, gr.scrollWidth), 0);
+        const lebarPenuh = Math.max(el.scrollWidth, lebarGrid + 34);
         el.style.overflow = 'visible';
         el.style.width = lebarPenuh + 'px';
         const canvas = await html2canvas(el, {
