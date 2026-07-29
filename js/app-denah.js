@@ -209,9 +209,10 @@ function denahSetMode(m) { _denahMode = m; renderDenah(); }
 // tanpa perlu mengeklik tombol lantai satu per satu.
 function _denahBlok(it, li, si, ii, vertikal) {
     if (it.t === 'tangga') {
-        const gaya = vertikal ? 'height:38px;flex:0 0 auto;' : 'width:42px;flex:0 0 auto;';
-        return `<div style="${gaya}" title="${_esc(it.nama || 'Tangga')}"
-            class="rounded-md border border-dashed border-slate-400 bg-slate-200 flex flex-col items-center justify-center text-slate-500">
+        // Tangga menempati sel grid tersendiri -> penuhi selnya supaya
+        // lurus sejajar dari lantai 1 sampai lantai teratas.
+        return `<div title="${_esc(it.nama || 'Tangga')}"
+            class="w-full h-full rounded-md border border-dashed border-slate-400 bg-slate-200 flex flex-col items-center justify-center text-slate-500">
             <i data-lucide="chevrons-up" class="w-3 h-3"></i>
             <span class="text-[7px] font-black uppercase leading-none">Tangga</span>
         </div>`;
@@ -227,21 +228,80 @@ function _denahBlok(it, li, si, ii, vertikal) {
     </div>`;
 }
 
-// Satu strip = satu sisi pada satu lantai
-function _denahStrip(s, si, li, no, vertikal, disorot) {
-    const isi = (s.items || []).map((it, ii) => _denahBlok(it, li, si, ii, vertikal)).join('')
-        || '<span class="text-[9px] text-slate-400 px-1 self-center">kosong</span>';
+// ── Penyelarasan tangga antar lantai ────────────────────────
+// Tangga itu bangunan fisik: posisinya TIDAK boleh bergeser antar
+// lantai walau jumlah/ukuran ruangan tiap lantai berbeda. Caranya:
+// pecah tiap sisi jadi segmen (dipisah tangga), lalu semua lantai
+// memakai template grid yang SAMA — lebar tiap segmen diambil dari
+// lantai yang paling "berat", sehingga kolom tangga selalu lurus.
+const DENAH_TANGGA_PX = 44;
+const DENAH_UNIT_X = 36;   // lebar minimum per satuan ukuran (sayap mendatar)
+const DENAH_UNIT_Y = 26;   // tinggi minimum per satuan ukuran (sayap tegak)
+
+function _pecahSegmen(items) {
+    const segs = [{ items: [] }];
+    const tangga = [];
+    (items || []).forEach((it, ii) => {
+        if (it.t === 'tangga') { tangga.push({ it: it, ii: ii }); segs.push({ items: [] }); }
+        else segs[segs.length - 1].items.push({ it: it, ii: ii });
+    });
+    return { segs: segs, tangga: tangga };
+}
+
+function _bobotSegmen(seg) {
+    return (seg ? seg.items : []).reduce((a, x) =>
+        a + Math.max(1, Math.min(4, parseInt(x.it.ukuran, 10) || 2)), 0);
+}
+
+function _denahTemplate(lantai, p) {
+    const perLantai = lantai.map(l => {
+        const s = (l.sisi || []).find(x => x.posisi === p);
+        return s ? _pecahSegmen(s.items) : null;
+    });
+    const isi = perLantai.filter(Boolean);
+    const nSeg = isi.length ? Math.max.apply(null, isi.map(x => x.segs.length)) : 1;
+    const bobot = [];
+    for (let k = 0; k < nSeg; k++) {
+        let m = 0;
+        isi.forEach(x => { const w = _bobotSegmen(x.segs[k]); if (w > m) m = w; });
+        bobot.push(m || 1);
+    }
+    const kol = [];
+    bobot.forEach((b, k) => { if (k > 0) kol.push(DENAH_TANGGA_PX + 'px'); kol.push(b + 'fr'); });
+    const total = bobot.reduce((a, b) => a + b, 0);
+    return {
+        nSeg: nSeg,
+        template: kol.join(' '),
+        minX: total * DENAH_UNIT_X + (nSeg - 1) * DENAH_TANGGA_PX + nSeg * 8,
+        minY: total * DENAH_UNIT_Y + (nSeg - 1) * 38 + nSeg * 8
+    };
+}
+
+// Satu strip = satu sisi pada satu lantai, memakai template bersama
+function _denahStrip(s, si, li, no, vertikal, tpl, disorot) {
+    const pecah = _pecahSegmen(s.items);
+    const sel = [];
+    for (let k = 0; k < tpl.nSeg; k++) {
+        if (k > 0) {
+            const t = pecah.tangga[k - 1];
+            sel.push(t ? _denahBlok(t.it, li, si, t.ii, vertikal) : '<div></div>');
+        }
+        const seg = pecah.segs[k];
+        sel.push(`<div class="flex ${vertikal ? 'flex-col' : 'flex-row'} gap-1">${
+            seg && seg.items.length ? seg.items.map(x => _denahBlok(x.it, li, si, x.ii, vertikal)).join('') : ''
+        }</div>`);
+    }
     const sorot = disorot ? 'ring-2 ring-indigo-400' : '';
-    const badge = `<span class="shrink-0 text-[9px] font-black text-white bg-slate-600 rounded px-1.5 py-0.5">L${_esc(no)}</span>`;
+    const badge = `<span class="text-[9px] font-black text-white bg-slate-600 rounded px-1.5 py-0.5">L${_esc(no)}</span>`;
     if (vertikal) {
         return `<div class="bg-slate-50 border border-slate-200 rounded-lg p-1 flex flex-col gap-1 ${sorot}" style="width:94px">
             <div class="flex justify-center">${badge}</div>
-            <div class="flex flex-col gap-1 flex-1">${isi}</div>
+            <div class="grid gap-1 flex-1" style="grid-template-rows:${tpl.template};min-height:${tpl.minY}px;">${sel.join('')}</div>
         </div>`;
     }
     return `<div class="bg-slate-50 border border-slate-200 rounded-lg p-1 flex items-stretch gap-1.5 ${sorot}">
-        <div class="flex items-center shrink-0">${badge}</div>
-        <div class="flex flex-row gap-1 flex-1">${isi}</div>
+        <div class="flex items-center justify-center shrink-0" style="width:26px">${badge}</div>
+        <div class="grid gap-1 flex-1" style="grid-template-columns:${tpl.template};min-width:${tpl.minX}px;">${sel.join('')}</div>
     </div>`;
 }
 
@@ -254,6 +314,10 @@ function _denahGambarGedung(g) {
     const lantai = g.lantai || [];
     const punya = (p) => lantai.some(l => (l.sisi || []).some(s => s.posisi === p));
 
+    // Template grid bersama per posisi -> tangga lurus antar lantai
+    const tpl = { atas: _denahTemplate(lantai, 'atas'), bawah: _denahTemplate(lantai, 'bawah'),
+                  kiri: _denahTemplate(lantai, 'kiri'), kanan: _denahTemplate(lantai, 'kanan') };
+
     // Lantai 1 paling dekat halaman: atas & kiri dibalik, bawah & kanan normal
     const blokPosisi = (p) => {
         const vertikal = (p === 'kiri' || p === 'kanan');
@@ -262,7 +326,7 @@ function _denahGambarGedung(g) {
         return urut.map(({ l, i }) => (l.sisi || [])
             .map((s, si) => ({ s, si }))
             .filter(x => x.s.posisi === p)
-            .map(x => _denahStrip(x.s, x.si, i, l.no, vertikal, _denahMode === 'edit' && i === _denahL))
+            .map(x => _denahStrip(x.s, x.si, i, l.no, vertikal, tpl[p], _denahMode === 'edit' && i === _denahL))
             .join('')
         ).join('');
     };
@@ -279,7 +343,8 @@ function _denahGambarGedung(g) {
     // Kolom tengah HARUS selebar isinya (max-content), kalau tidak sayap
     // selatan melimpah menabrak sayap samping.
     const kolom = (kiri ? lebarSisi + 'px ' : '') + 'minmax(max-content,1fr)' + (kanan ? ' ' + lebarSisi + 'px' : '');
-    const lebarMin = (kiri ? lebarSisi : 0) + (kanan ? lebarSisi : 0) + 300;
+    const lebarTengah = Math.max(300, (atas ? tpl.atas.minX : 0), (bawah ? tpl.bawah.minX : 0)) + 40;
+    const lebarMin = (kiri ? lebarSisi : 0) + (kanan ? lebarSisi : 0) + lebarTengah;
     const sudutKosong = '<div></div>';
 
     return `<div id="denah-print-area" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-x-auto">
