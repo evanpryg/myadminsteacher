@@ -50,6 +50,7 @@ function pindahHalaman(target) {
         'catatansiswa':   document.getElementById('halaman-catatansiswa'),
         'jurnalmengajar': document.getElementById('halaman-jurnalmengajar'),
         'jadwalview':     document.getElementById('halaman-jadwalview'),
+        'jadwalsekolah':  document.getElementById('halaman-jadwalsekolah'),
         'datamaster':     document.getElementById('halaman-datamaster'),
         'lessonplan':     document.getElementById('halaman-lessonplan'),
         'modulajar':      document.getElementById('halaman-modulajar'),
@@ -65,6 +66,7 @@ function pindahHalaman(target) {
         'catatansiswa':   document.getElementById('btn-nav-catatansiswa'),
         'jurnalmengajar': document.getElementById('btn-nav-jurnalmengajar'),
         'jadwalview':     document.getElementById('btn-nav-jadwalview'),
+        'jadwalsekolah':  document.getElementById('btn-nav-jadwalsekolah'),
         'datamaster':     document.getElementById('btn-nav-datamaster'),
         'lessonplan':     document.getElementById('btn-nav-lessonplan'),
         'modulajar':      document.getElementById('btn-nav-modulajar'),
@@ -100,6 +102,7 @@ function pindahHalaman(target) {
         'catatansiswa':   'Catatan Siswa',
         'jurnalmengajar': 'Jurnal Mengajar',
         'jadwalview':     'Jadwal Mengajar',
+        'jadwalsekolah':  'Jadwal Sekolah',
         'datamaster':     'Data',
         'lessonplan':     'Lesson Plan Generator',
         'modulajar':      'Modul Ajar Generator',
@@ -115,6 +118,7 @@ function pindahHalaman(target) {
     if (target === 'presensi' && typeof initHalamanPresensi === 'function') initHalamanPresensi();
     if (target === 'keaktifan' && typeof initHalamanKeaktifan === 'function') initHalamanKeaktifan();
     if (target === 'jadwalview' && typeof initHalamanJadwalView === 'function') initHalamanJadwalView();
+    if (target === 'jadwalsekolah' && typeof initHalamanJadwalSekolah === 'function') initHalamanJadwalSekolah();
     if (target === 'datamaster' && typeof initHalamanDataMaster === 'function') initHalamanDataMaster();
     if (target === 'pengaturan' && typeof initHalamanPengaturan === 'function') initHalamanPengaturan();
     if (target === 'lessonplan' && typeof initHalamanLessonPlan === 'function') initHalamanLessonPlan();
