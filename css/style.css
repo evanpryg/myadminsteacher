@@ -517,3 +517,14 @@
     body.mode-cetak-denah .no-print { display: none !important; }
     @page { size: landscape; margin: 10mm; }
 }
+
+/* ============================================================
+   SEMENTARA DISEMBUNYIKAN — Catatan Siswa & Jurnal Mengajar
+   Dipakai CSS (bukan kelas "hidden" di HTML) karena
+   pindahHalaman() menulis ulang className tombol nav.
+   Untuk menampilkan kembali: hapus blok ini.
+   ============================================================ */
+#btn-nav-catatansiswa,
+#btn-nav-jurnalmengajar {
+    display: none !important;
+}

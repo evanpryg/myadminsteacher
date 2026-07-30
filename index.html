@@ -47,6 +47,11 @@
                         class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left">
                     <i data-lucide="activity" class="w-5 h-5 text-indigo-600"></i> Keaktifan Siswa
                 </button>
+                <!-- SEMENTARA DISEMBUNYIKAN (atas permintaan): Catatan Siswa & Jurnal Mengajar.
+                     Disembunyikan lewat CSS di css/style.css (cari "SEMENTARA
+                     DISEMBUNYIKAN") karena pindahHalaman() menulis ulang className
+                     tombol nav, sehingga kelas "hidden" di sini akan terhapus.
+                     Halaman + seluruh kodenya tetap utuh. -->
                 <button onclick="pindahHalaman('catatansiswa')" id="btn-nav-catatansiswa"
                         class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left">
                     <i data-lucide="notebook-pen" class="w-5 h-5 text-indigo-600"></i> Catatan Siswa
