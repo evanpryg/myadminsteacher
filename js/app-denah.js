@@ -1,5 +1,5 @@
 // ============================================================
-// DENAH SEKOLAH (tab di menu Data)
+// DENAH SEKOLAH (halaman tersendiri di sidebar)
 // ------------------------------------------------------------
 // Model data sengaja TIDAK memakai koordinat/piksel, karena denah
 // sekolah jarang rapi. Yang dipakai:
@@ -13,6 +13,9 @@
 // - Ruangan punya "ukuran" relatif (1-4). Lebar digambar
 //   proporsional, sehingga sisi berisi 3 ruang besar dan sisi lain
 //   berisi 4 ruang kecil sama-sama pas tanpa ukuran meter.
+// - Satu ruangan bisa ditempati LEBIH DARI SATU kelas (field
+//   `kelas: []`). Kalau field itu kosong, nama ruangan sendiri yang
+//   dicocokkan ke data kelas -- perilaku denah lama tetap jalan.
 //
 // Disimpan sebagai JSON di app_settings (tanpa migration baru).
 // ============================================================
@@ -49,8 +52,23 @@ let _denahBelumSimpan = false;
 let _denahKelasInfo = {};     // nama kelas (lowercase) -> { total_siswa, nama_wali }
 let _denahDaftarKelas = [];
 
+// ── Kelas penghuni ruangan ──────────────────────────────────
+// Daftar kelas yang menempati satu ruangan. Data lama tidak punya
+// field `kelas`, jadi nama ruangan dipakai sebagai penggantinya.
+function _denahKelasRuang(it) {
+    const arr = Array.isArray(it.kelas)
+        ? it.kelas.map(x => String(x || '').trim()).filter(Boolean) : [];
+    if (arr.length) return arr;
+    const nm = String(it.nama || '').trim();
+    return (nm && _denahInfoKelas(nm)) ? [nm] : [];
+}
+
+function _denahInfoKelas(nama) {
+    return _denahKelasInfo[String(nama || '').toLowerCase().trim()] || null;
+}
+
 // ── Muat & simpan ───────────────────────────────────────────
-async function initTabDenah() {
+async function initHalamanDenah() {
     const canvas = document.getElementById('denah-canvas');
     if (canvas) canvas.innerHTML = '<div class="py-12 text-center text-indigo-500 animate-pulse font-semibold text-sm">Memuat denah...</div>';
     try {
@@ -223,11 +241,30 @@ function _denahBlok(it, li, si, ii, vertikal) {
     // proporsional -> ruangan berukuran sama tampil sama besar,
     // baik di sayap mendatar maupun sayap tegak.
     const gaya = `flex:${u} 1 0;min-width:0;min-height:0;`;
-    const kelas = _denahKelasInfo[String(it.nama || '').toLowerCase().trim()];
+    const kls = _denahKelasRuang(it);
+    let isi;
+    if (kls.length > 1) {
+        // Satu ruangan dipakai beberapa kelas -> kotaknya dibagi, supaya
+        // langsung terbaca "ruang ini isinya dua rombel", bukan dua ruang.
+        const bagi = kls.map(n => {
+            const k = _denahInfoKelas(n);
+            return `<div class="flex-1 min-w-0 flex flex-col items-center justify-center border border-dashed border-slate-400/60 rounded-sm px-0.5">
+                <span class="text-[9px] font-black leading-tight truncate w-full text-center">${_esc(n)}</span>
+                ${k ? `<span class="text-[7px] font-bold opacity-70 leading-none">${k.total_siswa}</span>` : ''}
+            </div>`;
+        }).join('');
+        isi = `${it.nama ? `<span class="text-[7px] font-black uppercase opacity-60 leading-none truncate w-full text-center">${_esc(it.nama)}</span>` : ''}
+            <div class="w-full flex-1 min-h-0 flex ${vertikal ? 'flex-col' : 'flex-row'} items-stretch gap-0.5 mt-0.5">${bagi}</div>`;
+    } else {
+        const judul = it.nama || kls[0] || '—';
+        const k = _denahInfoKelas(kls[0] || it.nama);
+        isi = `<span class="text-[10px] font-black leading-tight truncate w-full">${_esc(judul)}</span>
+            ${kls[0] && kls[0] !== judul ? `<span class="text-[8px] font-bold opacity-80 leading-none truncate w-full">${_esc(kls[0])}</span>` : ''}
+            ${k ? `<span class="text-[7px] font-bold opacity-70 leading-none">${k.total_siswa} siswa</span>` : ''}`;
+    }
     return `<div onclick="denahKlikRuang(${li},${si},${ii})" style="${gaya}"
         class="rounded-md border ${j.cls} px-1 py-1 cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all flex flex-col items-center justify-center text-center overflow-hidden">
-        <span class="text-[10px] font-black leading-tight truncate w-full">${_esc(it.nama || '—')}</span>
-        ${kelas ? `<span class="text-[7px] font-bold opacity-70 leading-none">${kelas.total_siswa} siswa</span>` : ''}
+        ${isi}
     </div>`;
 }
 
@@ -451,14 +488,19 @@ function denahKlikRuang(li, si, ii) {
     if (!info || !it) return;
     const j = DENAH_JENIS[it.jenis] || DENAH_JENIS.fasilitas;
     const u = (DENAH_UKURAN.find(x => x.v === (parseInt(it.ukuran, 10) || 2)) || {}).label || '-';
-    const k = _denahKelasInfo[String(it.nama || '').toLowerCase().trim()];
+    const kls = _denahKelasRuang(it);
+    const daftar = kls.map(n => {
+        const k = _denahInfoKelas(n);
+        return `<p class="text-[11px] font-bold mt-1 ${k ? 'text-indigo-600' : 'text-slate-400'}">Kelas ${_esc(n)}${
+            k ? ` · ${k.total_siswa} siswa · Wali: ${_esc(k.nama_wali || '-')}` : ' · belum ada di data wali kelas'}</p>`;
+    }).join('');
     info.innerHTML = `<div class="bg-white rounded-2xl border border-slate-200 p-4 flex items-start gap-3">
         <div class="w-10 h-10 rounded-xl border ${j.cls} flex items-center justify-center shrink-0"><i data-lucide="door-open" class="w-5 h-5"></i></div>
         <div class="flex-1 min-w-0">
-            <p class="font-black text-slate-800 text-sm">${_esc(it.nama || '—')}</p>
-            <p class="text-[11px] text-slate-500 font-semibold">${j.label} · Ukuran ${u} · ${_esc(lantai.sisi[si].nama)} · Lantai ${_esc(lantai.no)}</p>
-            ${k ? `<p class="text-[11px] text-indigo-600 font-bold mt-1">Kelas ${_esc(k.kelas)} · ${k.total_siswa} siswa · Wali: ${_esc(k.nama_wali || '-')}</p>`
-                : `<p class="text-[10px] text-slate-400 mt-1">Tidak terhubung ke data kelas (beri nama ruangan sama dengan nama kelas agar otomatis terhubung).</p>`}
+            <p class="font-black text-slate-800 text-sm">${_esc(it.nama || kls.join(' & ') || '—')}</p>
+            <p class="text-[11px] text-slate-500 font-semibold">${j.label} · Ukuran ${u} · ${_esc(lantai.sisi[si].nama)} · Lantai ${_esc(lantai.no)}${
+                kls.length > 1 ? ` · <span class="text-violet-600 font-bold">ditempati ${kls.length} kelas</span>` : ''}</p>
+            ${daftar || `<p class="text-[10px] text-slate-400 mt-1">Belum terhubung ke data kelas. Isi kolom <b>Kelas</b> pada ruangan ini lewat "Kelola Denah" (boleh lebih dari satu kelas).</p>`}
         </div>
         <button onclick="document.getElementById('denah-info').innerHTML=''" class="text-slate-300 hover:text-rose-500"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>`;
@@ -481,11 +523,18 @@ function _denahPanelEditor(lantai) {
                  <span class="text-[9px] font-black text-slate-400 uppercase px-1">Tangga</span>
                  ${_denahTombolUrut(si, ii)}
                </div>`
-            : `<div class="flex items-center gap-1.5 bg-white border border-slate-100 rounded-lg px-2 py-1.5">
-                 <input type="text" value="${_esc(it.nama || '')}" list="denah-dl-kelas" placeholder="Nama ruang" onchange="denahSetField(${si},${ii},'nama',this.value)" class="${inp} flex-1 min-w-0">
-                 <select onchange="denahSetField(${si},${ii},'jenis',this.value)" class="${inp} bg-white">${opsiJenis(it.jenis)}</select>
-                 <select onchange="denahSetField(${si},${ii},'ukuran',this.value)" class="${inp} bg-white">${opsiUkuran(it.ukuran)}</select>
-                 ${_denahTombolUrut(si, ii)}
+            : `<div class="bg-white border border-slate-100 rounded-lg px-2 py-1.5 space-y-1.5">
+                 <div class="flex items-center gap-1.5 flex-wrap">
+                   <input type="text" value="${_esc(it.nama || '')}" list="denah-dl-kelas" placeholder="Nama ruang" onchange="denahSetField(${si},${ii},'nama',this.value)" class="${inp} flex-1 min-w-[120px]">
+                   <select onchange="denahSetField(${si},${ii},'jenis',this.value)" class="${inp} bg-white">${opsiJenis(it.jenis)}</select>
+                   <select onchange="denahSetField(${si},${ii},'ukuran',this.value)" class="${inp} bg-white">${opsiUkuran(it.ukuran)}</select>
+                 </div>
+                 <div class="flex items-center gap-1.5 pl-0.5 flex-wrap">
+                   <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider shrink-0">Kelas</span>
+                   ${_denahSlotKelas(it, si, ii, inp)}
+                   <button onclick="denahTambahSlotKelas(${si},${ii})" title="Tambah kelas di ruangan ini" class="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 shrink-0"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+                   <div class="ml-auto">${_denahTombolUrut(si, ii)}</div>
+                 </div>
                </div>`).join('');
         return `<div class="border border-slate-200 rounded-xl p-3 space-y-2">
             <div class="flex items-center gap-2 flex-wrap">
@@ -505,7 +554,7 @@ function _denahPanelEditor(lantai) {
         <div class="flex items-center justify-between gap-2 flex-wrap">
             <div>
                 <p class="text-xs font-black text-slate-700">Kelola Lantai ${_esc(lantai.no)} — ${_esc(_gAktif().nama)}</p>
-                <p class="text-[10px] text-slate-400">Tulis ruangan berurutan sesuai kenyataan. Sisipkan <b>Tangga</b> di antaranya — segmen terbentuk sendiri.</p>
+                <p class="text-[10px] text-slate-400">Tulis ruangan berurutan sesuai kenyataan. Sisipkan <b>Tangga</b> di antaranya — segmen terbentuk sendiri. Kolom <b>Kelas</b> boleh diisi lebih dari satu bila ruangan itu ditempati beberapa rombel.</p>
             </div>
             <div class="flex items-center gap-2">
                 <button onclick="denahTambahSisi()" class="text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200">+ Sisi Bangunan</button>
@@ -514,6 +563,17 @@ function _denahPanelEditor(lantai) {
         </div>
         ${sisiHtml || '<p class="text-xs text-slate-400 text-center py-4">Belum ada sisi bangunan. Klik "+ Sisi Bangunan".</p>'}
     </div>`;
+}
+
+// Kotak isian kelas penghuni ruangan. Selalu ada minimal dua kotak
+// supaya kasus "satu ruangan dua kelas" bisa langsung diisi tanpa
+// mencari tombol dulu.
+function _denahSlotKelas(it, si, ii, inp) {
+    const arr = Array.isArray(it.kelas) ? it.kelas.slice() : [];
+    while (arr.length < 2) arr.push('');
+    return arr.map((n, ki) =>
+        `<input type="text" value="${_esc(n)}" list="denah-dl-kelas" placeholder="${ki === 0 ? 'Kelas penghuni' : '(kelas ke-' + (ki + 1) + ', opsional)'}"
+                onchange="denahSetKelas(${si},${ii},${ki},this.value)" class="${inp} flex-1 min-w-0">`).join('');
 }
 
 function _denahTombolUrut(si, ii) {
@@ -530,6 +590,26 @@ function denahSetField(si, ii, field, val) {
     it[field] = (field === 'ukuran') ? (parseInt(val, 10) || 2) : val;
     _denahUbah();
 }
+function denahSetKelas(si, ii, ki, val) {
+    const it = _lAktif().sisi[si].items[ii];
+    const arr = Array.isArray(it.kelas) ? it.kelas.slice() : [];
+    while (arr.length <= ki) arr.push('');
+    arr[ki] = String(val || '').trim();
+    // Buang yang kosong supaya urutannya rapat; hapus fieldnya kalau
+    // ruangan ini memang tidak ditempati kelas.
+    const bersih = arr.filter(Boolean);
+    if (bersih.length) it.kelas = bersih; else delete it.kelas;
+    _denahUbah();
+}
+
+function denahTambahSlotKelas(si, ii) {
+    const it = _lAktif().sisi[si].items[ii];
+    const arr = Array.isArray(it.kelas) ? it.kelas.slice() : [];
+    if (arr.length < 2) { alert('Isi dulu dua kotak kelas yang sudah tersedia.'); return; }
+    it.kelas = arr.concat('');
+    _denahUbah();
+}
+
 function denahSetSisi(si, field, val) { _lAktif().sisi[si][field] = val; _denahUbah(); }
 function denahTambahItem(si, tipe) {
     const items = _lAktif().sisi[si].items;

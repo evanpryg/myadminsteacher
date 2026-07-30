@@ -68,6 +68,10 @@
                         class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left">
                     <i data-lucide="calendar-range" class="w-5 h-5 text-indigo-600"></i> Jadwal Sekolah
                 </button>
+                <button onclick="pindahHalaman('denah')" id="btn-nav-denah"
+                        class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left">
+                    <i data-lucide="map" class="w-5 h-5 text-indigo-600"></i> Denah Sekolah
+                </button>
                 <button onclick="pindahHalaman('datamaster')" id="btn-nav-datamaster"
                         class="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl font-medium text-sm transition-all text-left">
                     <i data-lucide="database" class="w-5 h-5 text-indigo-600"></i> Data
@@ -572,6 +576,18 @@
             </div>
 
             <!-- ============================================================
+                 HALAMAN DENAH SEKOLAH
+                 Berdiri sendiri di sidebar (bukan tab menu Data) karena
+                 sering dibuka sebelum mengajar.
+                 ============================================================ -->
+            <div id="halaman-denah" class="hidden space-y-3">
+                <div id="denah-toolbar"></div>
+                <div id="denah-canvas"></div>
+                <div id="denah-info"></div>
+                <div id="denah-editor"></div>
+            </div>
+
+            <!-- ============================================================
                  HALAMAN DATA (Siswa Diampu, Guru, Wali Kelas)
                  ============================================================ -->
             <div id="halaman-datamaster" class="hidden space-y-5">
@@ -580,7 +596,6 @@
                     <button id="dm-tab-siswa" onclick="tampilkanTabData('siswa')" class="px-5 py-2.5 text-sm font-bold rounded-xl bg-indigo-600 text-white shadow-sm transition-all">Data Siswa</button>
                     <button id="dm-tab-guru" onclick="tampilkanTabData('guru')" class="px-5 py-2.5 text-sm font-medium rounded-xl text-slate-500 hover:bg-slate-100 transition-all">Data Guru</button>
                     <button id="dm-tab-wali" onclick="tampilkanTabData('wali')" class="px-5 py-2.5 text-sm font-medium rounded-xl text-slate-500 hover:bg-slate-100 transition-all">Data Wali Kelas</button>
-                    <button id="dm-tab-denah" onclick="tampilkanTabData('denah')" class="px-5 py-2.5 text-sm font-medium rounded-xl text-slate-500 hover:bg-slate-100 transition-all">Denah Sekolah</button>
                 </div>
 
                 <!-- Panel: Data Siswa (yang diampu) -->
@@ -632,14 +647,6 @@
                             <button onclick="simpanGuru()" class="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm">Simpan</button>
                         </div>
                     </div>
-                </div>
-
-                <!-- Panel: Denah Sekolah -->
-                <div id="dm-panel-denah" class="hidden space-y-3">
-                    <div id="denah-toolbar"></div>
-                    <div id="denah-canvas"></div>
-                    <div id="denah-info"></div>
-                    <div id="denah-editor"></div>
                 </div>
 
                 <!-- Modal Import Guru (CSV/Excel) -->

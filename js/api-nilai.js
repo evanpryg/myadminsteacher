@@ -651,7 +651,7 @@ async function initHalamanDataMaster() {
 }
 
 function tampilkanTabData(tab) {
-    ['siswa', 'guru', 'wali', 'denah'].forEach(t => {
+    ['siswa', 'guru', 'wali'].forEach(t => {
         const panel = document.getElementById('dm-panel-' + t);
         const btn = document.getElementById('dm-tab-' + t);
         if (panel) panel.classList.add('hidden');
@@ -665,7 +665,6 @@ function tampilkanTabData(tab) {
     if (tab === 'siswa' && typeof muatDmSiswa === 'function') muatDmSiswa();
     if (tab === 'guru' && typeof muatDmGuru === 'function') muatDmGuru();
     if (tab === 'wali' && typeof muatDmWali === 'function') muatDmWali();
-    if (tab === 'denah' && typeof initTabDenah === 'function') initTabDenah();
 }
 
 async function muatDmSiswa() {
