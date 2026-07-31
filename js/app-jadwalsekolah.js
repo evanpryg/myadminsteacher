@@ -47,106 +47,153 @@ function jsTampilkanTab(tab) {
     lucide.createIcons();
 }
 
-// Kelompokkan pelajaran satu hari menjadi klaster yang saling
-// bertumpang tindih, lalu bagi tiap klaster ke beberapa jalur agar
-// pelajaran yang bentrok tampil berdampingan, bukan saling menutupi.
-function _jsSusunHari(daftar, idxOf) {
-    const ev = daftar.map(s => {
-        const r = jsRentangJam(s.jam_ke);
-        return r ? { s: s, a: idxOf[r.dari], b: idxOf[r.sampai] } : null;
-    }).filter(e => e && e.a !== undefined && e.b !== undefined)
-        .sort((x, y) => x.a - y.a || x.b - y.b);
-
-    const klaster = [];
-    let cur = null;
-    ev.forEach(e => {
-        if (cur && e.a <= cur.b) { cur.ev.push(e); cur.b = Math.max(cur.b, e.b); }
-        else { cur = { a: e.a, b: e.b, ev: [e] }; klaster.push(cur); }
-    });
-    klaster.forEach(k => {
-        k.jalur = [];
-        k.ev.forEach(e => {
-            let j = k.jalur.findIndex(l => l.every(o => e.a > o.b || e.b < o.a));
-            if (j < 0) { k.jalur.push([]); j = k.jalur.length - 1; }
-            k.jalur[j].push(e);
-        });
-    });
-    return klaster;
+function _jsMenit(t) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
+    return m ? (+m[1] * 60 + +m[2]) : null;
 }
 
-// ── Grid mingguan (dipakai tab kelas & guru) ────────────────
-// Satu baris = satu JAM PELAJARAN. Pelajaran yang lebih dari 1 JP
-// digambar membentang ke bawah sepanjang jamnya.
+// Bagi pelajaran satu hari ke beberapa lajur ketika jamnya bertumpang
+// tindih, supaya tampil berdampingan dan tidak saling menutupi.
+// Cara kerjanya sama dengan kalender Jadwal Mengajar.
+function _jsSusunHari(daftar) {
+    const ev = daftar.map(s => {
+        const a = _jsMenit(s.jam_mulai), b = _jsMenit(s.jam_selesai);
+        return (a !== null && b !== null && b > a) ? { s: s, a: a, b: b } : null;
+    }).filter(Boolean).sort((x, y) => x.a - y.a || y.b - x.b);
+
+    let klaster = [], akhirLajur = [], batasKlaster = -Infinity;
+    const tutup = () => {
+        const n = akhirLajur.length || 1;
+        klaster.forEach(e => { e.lajur = n; });
+        klaster = []; akhirLajur = [];
+    };
+    ev.forEach(e => {
+        if (klaster.length && e.a >= batasKlaster) { tutup(); batasKlaster = -Infinity; }
+        let taruh = false;
+        for (let c = 0; c < akhirLajur.length; c++) {
+            if (akhirLajur[c] <= e.a) { e.kol = c; akhirLajur[c] = e.b; taruh = true; break; }
+        }
+        if (!taruh) { e.kol = akhirLajur.length; akhirLajur.push(e.b); }
+        klaster.push(e);
+        batasKlaster = Math.max(batasKlaster, e.b);
+    });
+    tutup();
+    return ev;
+}
+
+// ── Kalender mingguan (dipakai tab kelas & guru) ────────────
+// Tinggi kartu sebanding dengan durasinya, persis seperti kalender
+// Jadwal Mengajar: pelajaran 2 JP dua kali lebih tinggi daripada 1 JP,
+// dan jeda istirahat terlihat sebagai celah.
 function _jsGrid(slot, mode) {
     const jamList = jsDaftarJam(_jsState.semua);
     if (!jamList.length) return '<p class="text-sm text-slate-400 text-center py-8">Belum ada data jadwal.</p>';
-    const idxOf = {};
-    jamList.forEach((j, i) => { idxOf[j.no] = i; });
+
+    let minM = Infinity, maxM = -Infinity;
+    const catat = (a, b) => {
+        if (a !== null) minM = Math.min(minM, a);
+        if (b !== null) maxM = Math.max(maxM, b);
+    };
+    jamList.forEach(j => catat(_jsMenit(j.mulai), _jsMenit(j.selesai)));
+    slot.forEach(s => catat(_jsMenit(s.jam_mulai), _jsMenit(s.jam_selesai)));
+    if (!isFinite(minM) || !isFinite(maxM) || maxM <= minM) {
+        return '<p class="text-sm text-slate-400 text-center py-8">Jam pelajaran belum terbaca. Impor ulang PDF jadwal.</p>';
+    }
+    minM -= 6; maxM += 6;
+
+    const PPM = 1.25;                       // piksel per menit -> 1 JP (40') = 50px
+    const TINGGI = Math.round((maxM - minM) * PPM);
+    const posy = (m) => Math.round((m - minM) * PPM);
 
     const warna = {
-        mengajar: 'bg-indigo-100 border-indigo-300 text-indigo-900',
-        piket: 'bg-amber-100 border-amber-300 text-amber-900',
-        elective: 'bg-emerald-100 border-emerald-300 text-emerald-900',
-        paralel: 'bg-violet-100 border-violet-300 text-violet-900'
+        mengajar: ['bg-indigo-100 border-indigo-300', 'text-indigo-900'],
+        piket: ['bg-amber-100 border-amber-300', 'text-amber-900'],
+        elective: ['bg-emerald-100 border-emerald-300', 'text-emerald-900'],
+        paralel: ['bg-violet-100 border-violet-300', 'text-violet-900']
     };
     const hariIni = jsHariIniIdx();
-    const jamKini = jsJamSekarang();
-    const isiSel = [];   // penanda sel yang sudah terpakai
+    const menitKini = _jsMenit(jsJamSekarang());
 
-    let html = '';
-    // Baris judul
-    html += '<div style="grid-column:1;grid-row:1"></div>';
-    JADWAL_HARI_ID.forEach((h, i) => {
-        html += `<div style="grid-column:${i + 2};grid-row:1" class="text-center px-2 py-2 rounded-lg text-xs font-black ${i === hariIni ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-500'}">${h}</div>`;
-    });
-    // Kolom jam
+    // Latar: garis batas tiap jam pelajaran + arsiran jeda istirahat
+    let latar = '';
     jamList.forEach((j, i) => {
-        html += `<div style="grid-column:1;grid-row:${i + 2}" class="flex flex-col items-center justify-center bg-slate-50 rounded-lg py-1">
-            <span class="text-[10px] font-black text-slate-500">Jam ${j.no}</span>
-            ${j.mulai ? `<span class="text-[9px] font-bold text-slate-400">${lpEscape(j.mulai)}</span>` : ''}
-            ${j.selesai ? `<span class="text-[9px] text-slate-400">${lpEscape(j.selesai)}</span>` : ''}
+        const a = _jsMenit(j.mulai), b = _jsMenit(j.selesai);
+        if (a === null || b === null) return;
+        latar += `<div class="absolute left-0 right-0 border-t border-slate-100" style="top:${posy(a)}px"></div>`;
+        if (i + 1 < jamList.length) {
+            const c = _jsMenit(jamList[i + 1].mulai);
+            if (c !== null && c > b + 1) {
+                // kelas polos (tanpa /opacity) supaya kena override tema gelap
+                latar += `<div class="absolute left-0 right-0 bg-slate-100" style="top:${posy(b)}px;height:${posy(c) - posy(b)}px"></div>`;
+            }
+        }
+    });
+    latar += `<div class="absolute left-0 right-0 border-t border-slate-100" style="top:${posy(maxM - 6)}px"></div>`;
+
+    // Gutter: nomor jam pelajaran + waktunya, tingginya ikut durasi
+    let gutter = '';
+    jamList.forEach((j, i) => {
+        const a = _jsMenit(j.mulai), b = _jsMenit(j.selesai);
+        if (a === null || b === null) return;
+        gutter += `<div class="absolute left-0 right-0 flex flex-col items-center justify-center text-center"
+            style="top:${posy(a)}px;height:${posy(b) - posy(a)}px">
+            <span class="text-[10px] font-black text-slate-500 leading-none">Jam ${j.no}</span>
+            <span class="text-[9px] font-bold text-slate-400 leading-tight">${lpEscape(j.mulai)}</span>
+            <span class="text-[9px] text-slate-400 leading-tight">${lpEscape(j.selesai)}</span>
         </div>`;
+        if (i + 1 < jamList.length) {
+            const c = _jsMenit(jamList[i + 1].mulai);
+            if (c !== null && c > b + 1) {
+                gutter += `<div class="absolute left-0 right-0 flex items-center justify-center" style="top:${posy(b)}px;height:${posy(c) - posy(b)}px">
+                    <span class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Istirahat</span>
+                </div>`;
+            }
+        }
     });
 
-    const kartu = (e, sedang) => {
-        const s = e.s;
-        const w = warna[s.jenis] || warna.mengajar;
-        const panjang = e.b - e.a + 1;
-        const baris2 = mode === 'kelas'
-            ? (s.kode_guru ? lpEscape(s.kode_guru) + (jsNama(s.kode_guru) ? ' · ' + lpEscape(jsNama(s.kode_guru).split(',')[0]) : '') : '—')
-            : lpEscape(s.kelas || '—');
-        return `<div onclick="jsKlikSlot(${_jsState.semua.indexOf(s)})"
-            class="rounded-lg border ${w} px-2 py-1.5 cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all overflow-hidden ${sedang ? 'ring-2 ring-rose-400' : ''}">
-            <p class="text-[11px] font-black leading-tight line-clamp-2">${lpEscape(s.mapel || '—')}</p>
-            <p class="text-[9px] font-bold opacity-80 leading-tight truncate">${baris2}</p>
-            <p class="text-[8px] font-bold opacity-60 leading-none mt-0.5">${panjang} JP · jam ${lpEscape(s.jam_ke)}</p>
-        </div>`;
-    };
-
+    let kolomHtml = '';
     for (let d = 0; d < 6; d++) {
-        const klaster = _jsSusunHari(slot.filter(s => s.hari_idx === d), idxOf);
-        klaster.forEach(k => {
-            for (let i = k.a; i <= k.b; i++) isiSel.push(d + '|' + i);
-            const tinggi = k.b - k.a + 1;
-            const dalam = k.jalur.map((lane, ji) => lane.map(e => {
-                const j = jamList[e.a], j2 = jamList[e.b];
-                const sedang = d === hariIni && j.mulai <= jamKini && jamKini < j2.selesai;
-                return `<div style="grid-column:${ji + 1};grid-row:${e.a - k.a + 1} / span ${e.b - e.a + 1}">${kartu(e, sedang)}</div>`;
-            }).join('')).join('');
-            html += `<div style="grid-column:${d + 2};grid-row:${k.a + 2} / span ${tinggi}">
-                <div class="grid gap-1 h-full" style="grid-template-rows:repeat(${tinggi},minmax(0,1fr));grid-template-columns:repeat(${k.jalur.length},minmax(0,1fr));">${dalam}</div>
+        const ev = _jsSusunHari(slot.filter(s => s.hari_idx === d));
+        const blok = ev.map(e => {
+            const s = e.s;
+            const pal = warna[s.jenis] || warna.mengajar;
+            const n = e.lajur || 1, c = e.kol || 0;
+            const tinggi = Math.max(posy(e.b) - posy(e.a), 22);
+            const jp = jsPanjangJam(s.jam_ke);
+            const baris2 = mode === 'kelas'
+                ? (s.kode_guru ? lpEscape(s.kode_guru) + (jsNama(s.kode_guru) ? ' · ' + lpEscape(jsNama(s.kode_guru).split(',')[0]) : '') : '—')
+                : lpEscape(s.kelas || '—');
+            const sedang = d === hariIni && menitKini !== null && e.a <= menitKini && menitKini < e.b;
+            // Saat bentrok, blok menyempit -> hover melebarkannya agar terbaca
+            const lebar = n > 1 ? ' hover:!left-1 hover:!right-1 hover:!w-auto hover:z-30' : '';
+            return `<div onclick="jsKlikSlot(${_jsState.semua.indexOf(s)})"
+                title="${lpEscape(s.mapel || '')} · jam ${lpEscape(s.jam_ke)} (${lpEscape(s.jam_mulai)}–${lpEscape(s.jam_selesai)})"
+                class="absolute rounded-lg border ${pal[0]} ${pal[1]} px-1.5 py-1 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-indigo-400 transition-all${lebar} ${sedang ? 'ring-2 ring-rose-400' : ''}"
+                style="left:calc(${(c / n * 100).toFixed(4)}% + 2px);width:calc(${(100 / n).toFixed(4)}% - 4px);top:${posy(e.a)}px;height:${tinggi}px">
+                <p class="text-[8px] font-black opacity-70 leading-none">${lpEscape(s.jam_mulai)}–${lpEscape(s.jam_selesai)} · ${jp} JP</p>
+                <p class="text-[10px] font-black leading-tight line-clamp-2 mt-0.5">${lpEscape(s.mapel || '—')}</p>
+                <p class="text-[9px] font-bold opacity-80 leading-tight truncate">${baris2}</p>
             </div>`;
-        });
-        // Sel kosong
-        jamList.forEach((j, i) => {
-            if (isiSel.indexOf(d + '|' + i) !== -1) return;
-            const sedang = d === hariIni && j.mulai <= jamKini && jamKini < j.selesai;
-            html += `<div style="grid-column:${d + 2};grid-row:${i + 2}" class="rounded-lg border border-dashed border-slate-200 ${sedang ? 'ring-2 ring-rose-300' : ''}"></div>`;
-        });
+        }).join('');
+        const garisKini = (d === hariIni && menitKini !== null && menitKini >= minM && menitKini <= maxM)
+            ? `<div class="absolute left-0 right-0 border-t-2 border-rose-400 z-20 pointer-events-none" style="top:${posy(menitKini)}px"><span class="absolute -top-1 -left-0.5 w-2 h-2 rounded-full bg-rose-400"></span></div>`
+            : '';
+        kolomHtml += `<div class="relative border-l border-slate-100" style="height:${TINGGI}px">${latar}${blok}${garisKini}</div>`;
     }
 
-    return `<div class="overflow-x-auto"><div class="min-w-[860px] grid gap-1"
-        style="grid-template-columns:96px repeat(6,1fr);grid-auto-rows:minmax(52px,auto);">${html}</div></div>`;
+    let judul = '';
+    JADWAL_HARI_ID.forEach((h, i) => {
+        judul += `<div class="border-b border-l border-slate-100 px-2 py-2 text-center text-xs font-black ${i === hariIni ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-500'}">${h}</div>`;
+    });
+
+    return `<div class="overflow-x-auto"><div class="min-w-[840px] bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div class="grid" style="grid-template-columns:62px repeat(6,minmax(122px,1fr));">
+            <div class="border-b border-slate-100 bg-slate-50"></div>
+            ${judul}
+            <div class="relative bg-slate-50" style="height:${TINGGI}px">${gutter}</div>
+            ${kolomHtml}
+        </div>
+    </div></div>`;
 }
 
 function jsKlikSlot(idx) {
