@@ -493,26 +493,33 @@
 }
 /* ============================================================
    CETAK DENAH SEKOLAH
-   Saat tombol "Cetak / PDF" ditekan, body diberi kelas
-   .mode-cetak-denah lalu hanya area denah yang dicetak.
+   Yang dicetak adalah GAMBAR denah (#denah-cetak-img), bukan DOM-nya.
+   Denah jauh lebih lebar daripada kertas; mencetak DOM apa adanya
+   membuatnya terpotong separuh, sedangkan gambar bisa diskalakan
+   utuh ke lebar kertas.
    ============================================================ */
+#denah-cetak-img { display: none; }
+
 @media print {
     body.mode-cetak-denah * {
         visibility: hidden !important;
     }
-    body.mode-cetak-denah #denah-print-area,
-    body.mode-cetak-denah #denah-print-area * {
+    body.mode-cetak-denah #denah-cetak-img,
+    body.mode-cetak-denah #denah-cetak-img * {
         visibility: visible !important;
     }
-    body.mode-cetak-denah #denah-print-area {
+    body.mode-cetak-denah #denah-cetak-img {
+        display: block !important;
         position: absolute !important;
         left: 0; top: 0;
         width: 100%;
-        min-width: 0 !important;
-        border: none !important;
-        box-shadow: none !important;
-        overflow: visible !important;
+        margin: 0 !important;
         padding: 0 !important;
+    }
+    body.mode-cetak-denah #denah-cetak-img img {
+        width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
     }
     body.mode-cetak-denah .no-print { display: none !important; }
     @page { size: landscape; margin: 10mm; }

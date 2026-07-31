@@ -205,7 +205,7 @@ function renderDenah() {
                     ? `<button onclick="denahSalinLantai()" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 px-3 py-2 rounded-xl"><i data-lucide="copy" class="w-3.5 h-3.5"></i>Salin dari Lantai Lain</button>
                        <button id="denah-btn-simpan" onclick="simpanDenah()" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm"><i data-lucide="save" class="w-3.5 h-3.5"></i>Simpan</button>
                        <button onclick="denahSetMode('lihat')" class="text-xs font-bold text-slate-500 hover:bg-slate-100 px-3 py-2 rounded-xl border">Selesai</button>`
-                    : `<button onclick="cetakDenah()" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 px-3 py-2 rounded-xl"><i data-lucide="printer" class="w-3.5 h-3.5"></i>Cetak / PDF</button>
+                    : `<button id="denah-btn-cetak" onclick="cetakDenah()" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 px-3 py-2 rounded-xl"><i data-lucide="printer" class="w-3.5 h-3.5"></i>Cetak / PDF</button>
                        <button id="denah-btn-png" onclick="unduhDenahPNG()" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 px-3 py-2 rounded-xl"><i data-lucide="image-down" class="w-3.5 h-3.5"></i>Unduh Gambar</button>
                        <button onclick="denahSetMode('edit')" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm"><i data-lucide="pencil" class="w-3.5 h-3.5"></i>Kelola Denah</button>`}
             </div>
@@ -415,54 +415,94 @@ function _denahGambarGedung(g) {
 }
 
 // ── Cetak & unduh ───────────────────────────────────────────
-function cetakDenah() {
-    document.body.classList.add('mode-cetak-denah');
-    window.print();
-    setTimeout(() => document.body.classList.remove('mode-cetak-denah'), 800);
-}
-
-async function unduhDenahPNG() {
-    const btn = document.getElementById('denah-btn-png');
+// Satu jalur render dipakai bersama oleh "Unduh Gambar" dan
+// "Cetak / PDF", supaya hasil cetak persis sama dengan gambarnya.
+async function _denahKanvas() {
     const el = document.getElementById('denah-print-area');
-    if (!el) return;
-    if (btn) { btn.disabled = true; btn.innerHTML = 'Menyiapkan...'; }
-    let bungkus = null;
+    if (!el) throw new Error('Denah belum tergambar.');
+    if (typeof html2canvas === 'undefined') {
+        await new Promise((res, rej) => {
+            const s = document.createElement('script');
+            s.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
+            s.onload = res;
+            s.onerror = () => rej(new Error('Gagal memuat library gambar. Periksa koneksi internet.'));
+            document.head.appendChild(s);
+        });
+    }
+    // Denah biasanya lebih lebar dari layar dan berada di dalam kotak
+    // ber-scroll, sehingga tangkapan langsung selalu terpotong.
+    // Solusi: KLONING ke wadah di luar layar dgn lebar penuh.
+    const lebarIsi = [...el.querySelectorAll('.grid')].reduce((m, gr) =>
+        Math.max(m, gr.scrollWidth, gr.getBoundingClientRect().width), 0);
+    const lebar = Math.ceil(Math.max(el.scrollWidth, lebarIsi + 36)) + 4;
+
+    const bungkus = document.createElement('div');
+    bungkus.style.cssText = 'position:absolute;left:-99999px;top:0;z-index:-1;background:#ffffff;width:' + lebar + 'px;';
+    const klon = el.cloneNode(true);
+    klon.removeAttribute('id');
+    klon.style.width = lebar + 'px';
+    klon.style.maxWidth = 'none';
+    klon.style.overflow = 'visible';
+    klon.style.boxShadow = 'none';
+
+    // html2canvas memotong teks yang elemennya ber-overflow:hidden
+    // (kelas "truncate"), sehingga nama ruangan tampak terpotong
+    // separuh. Di klon, batas itu dilepas -- teks yang kepanjangan
+    // tetap terpangkas oleh kotak ruangannya sendiri.
+    klon.querySelectorAll('.truncate').forEach(n => {
+        n.style.overflow = 'visible';
+        n.style.textOverflow = 'clip';
+    });
+
+    bungkus.appendChild(klon);
+    document.body.appendChild(bungkus);
+    await new Promise(r => setTimeout(r, 60));   // beri waktu layout
     try {
-        if (typeof html2canvas === 'undefined') {
-            await new Promise((res, rej) => {
-                const s = document.createElement('script');
-                s.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
-                s.onload = res;
-                s.onerror = () => rej(new Error('Gagal memuat library gambar. Periksa koneksi internet.'));
-                document.head.appendChild(s);
-            });
-        }
-        // Denah biasanya lebih lebar dari layar dan di dalam kotak
-        // ber-scroll, sehingga tangkapan langsung selalu terpotong.
-        // Solusi: KLONING ke wadah di luar layar dgn lebar penuh,
-        // lalu tangkap wadah itu.
-        const lebarIsi = [...el.querySelectorAll('.grid')].reduce((m, gr) =>
-            Math.max(m, gr.scrollWidth, gr.getBoundingClientRect().width), 0);
-        const lebar = Math.ceil(Math.max(el.scrollWidth, lebarIsi + 36)) + 4;
-
-        bungkus = document.createElement('div');
-        bungkus.style.cssText = 'position:absolute;left:-99999px;top:0;z-index:-1;background:#ffffff;width:' + lebar + 'px;';
-        const klon = el.cloneNode(true);
-        klon.removeAttribute('id');
-        klon.style.width = lebar + 'px';
-        klon.style.maxWidth = 'none';
-        klon.style.overflow = 'visible';
-        klon.style.boxShadow = 'none';
-        bungkus.appendChild(klon);
-        document.body.appendChild(bungkus);
-        // beri waktu layout menghitung ulang
-        await new Promise(r => setTimeout(r, 60));
-
-        const canvas = await html2canvas(bungkus, {
+        return await html2canvas(bungkus, {
             backgroundColor: '#ffffff', scale: 2,
             width: bungkus.scrollWidth, height: bungkus.scrollHeight,
             windowWidth: lebar + 200, scrollX: 0, scrollY: 0
         });
+    } finally {
+        if (bungkus.parentNode) bungkus.parentNode.removeChild(bungkus);
+    }
+}
+
+// Cetak lewat GAMBAR, bukan DOM. Denah jauh lebih lebar daripada
+// kertas, dan mencetak DOM apa adanya membuatnya terpotong separuh.
+// Gambar bisa diskalakan utuh ke lebar kertas.
+async function cetakDenah() {
+    const btn = document.getElementById('denah-btn-cetak');
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Menyiapkan...'; }
+    let kotak = null;
+    try {
+        const canvas = await _denahKanvas();
+        kotak = document.createElement('div');
+        kotak.id = 'denah-cetak-img';
+        const img = document.createElement('img');
+        img.style.cssText = 'width:100%;height:auto;display:block';
+        img.src = canvas.toDataURL('image/png');
+        kotak.appendChild(img);
+        document.body.appendChild(kotak);
+        if (img.decode) { try { await img.decode(); } catch (e) { /* lanjut saja */ } }
+        document.body.classList.add('mode-cetak-denah');
+        window.print();
+    } catch (err) {
+        alert('Gagal menyiapkan cetakan: ' + (err.message || err));
+    } finally {
+        setTimeout(() => {
+            document.body.classList.remove('mode-cetak-denah');
+            if (kotak && kotak.parentNode) kotak.parentNode.removeChild(kotak);
+        }, 800);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="printer" class="w-3.5 h-3.5"></i>Cetak / PDF'; lucide.createIcons(); }
+    }
+}
+
+async function unduhDenahPNG() {
+    const btn = document.getElementById('denah-btn-png');
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Menyiapkan...'; }
+    try {
+        const canvas = await _denahKanvas();
         canvas.toBlob(function (blob) {
             const nama = 'Denah-' + String(_gAktif().nama).replace(/[\\/:*?"<>|\s]+/g, '-') + '.png';
             if (typeof lpDownloadBlob === 'function') lpDownloadBlob(blob, nama);
@@ -473,9 +513,7 @@ async function unduhDenahPNG() {
             }
         });
     } catch (err) {
-        alert('Gagal membuat gambar: ' + (err.message || err) + '\n\nAlternatif: gunakan tombol "Cetak / PDF" lalu pilih "Save as PDF".');
-    } finally {
-        if (bungkus && bungkus.parentNode) bungkus.parentNode.removeChild(bungkus);
+        alert('Gagal membuat gambar: ' + (err.message || err));
     }
     if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="image-down" class="w-3.5 h-3.5"></i>Unduh Gambar'; lucide.createIcons(); }
 }
