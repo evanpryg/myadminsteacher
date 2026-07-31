@@ -47,10 +47,41 @@ function jsTampilkanTab(tab) {
     lucide.createIcons();
 }
 
+// Kelompokkan pelajaran satu hari menjadi klaster yang saling
+// bertumpang tindih, lalu bagi tiap klaster ke beberapa jalur agar
+// pelajaran yang bentrok tampil berdampingan, bukan saling menutupi.
+function _jsSusunHari(daftar, idxOf) {
+    const ev = daftar.map(s => {
+        const r = jsRentangJam(s.jam_ke);
+        return r ? { s: s, a: idxOf[r.dari], b: idxOf[r.sampai] } : null;
+    }).filter(e => e && e.a !== undefined && e.b !== undefined)
+        .sort((x, y) => x.a - y.a || x.b - y.b);
+
+    const klaster = [];
+    let cur = null;
+    ev.forEach(e => {
+        if (cur && e.a <= cur.b) { cur.ev.push(e); cur.b = Math.max(cur.b, e.b); }
+        else { cur = { a: e.a, b: e.b, ev: [e] }; klaster.push(cur); }
+    });
+    klaster.forEach(k => {
+        k.jalur = [];
+        k.ev.forEach(e => {
+            let j = k.jalur.findIndex(l => l.every(o => e.a > o.b || e.b < o.a));
+            if (j < 0) { k.jalur.push([]); j = k.jalur.length - 1; }
+            k.jalur[j].push(e);
+        });
+    });
+    return klaster;
+}
+
 // ── Grid mingguan (dipakai tab kelas & guru) ────────────────
+// Satu baris = satu JAM PELAJARAN. Pelajaran yang lebih dari 1 JP
+// digambar membentang ke bawah sepanjang jamnya.
 function _jsGrid(slot, mode) {
     const jamList = jsDaftarJam(_jsState.semua);
     if (!jamList.length) return '<p class="text-sm text-slate-400 text-center py-8">Belum ada data jadwal.</p>';
+    const idxOf = {};
+    jamList.forEach((j, i) => { idxOf[j.no] = i; });
 
     const warna = {
         mengajar: 'bg-indigo-100 border-indigo-300 text-indigo-900',
@@ -60,39 +91,62 @@ function _jsGrid(slot, mode) {
     };
     const hariIni = jsHariIniIdx();
     const jamKini = jsJamSekarang();
+    const isiSel = [];   // penanda sel yang sudah terpakai
 
-    let html = `<div class="overflow-x-auto"><div class="min-w-[860px] grid gap-1" style="grid-template-columns:96px repeat(6,1fr);">
-        <div></div>` +
-        JADWAL_HARI_ID.map((h, i) => `<div class="text-center px-2 py-2 rounded-lg text-xs font-black ${i === hariIni ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-500'}">${h}</div>`).join('');
-
-    jamList.forEach(j => {
-        html += `<div class="flex flex-col items-center justify-center bg-slate-50 rounded-lg py-2">
-            <span class="text-[10px] font-black text-slate-500">${lpEscape(j.jam_ke || '')}</span>
-            <span class="text-[9px] font-bold text-slate-400">${lpEscape(j.mulai)}</span>
-            <span class="text-[9px] text-slate-400">${lpEscape(j.selesai)}</span>
-        </div>`;
-        for (let d = 0; d < 6; d++) {
-            const isi = slot.filter(s => s.hari_idx === d && s.jam_mulai === j.mulai && s.jam_selesai === j.selesai);
-            const sedang = d === hariIni && j.mulai <= jamKini && jamKini < j.selesai;
-            if (!isi.length) {
-                html += `<div class="rounded-lg border border-dashed border-slate-200 min-h-[54px] ${sedang ? 'ring-2 ring-rose-300' : ''}"></div>`;
-                continue;
-            }
-            html += isi.map(s => {
-                const w = warna[s.jenis] || warna.mengajar;
-                const baris2 = mode === 'kelas'
-                    ? (s.kode_guru ? lpEscape(s.kode_guru) + (jsNama(s.kode_guru) ? ' · ' + lpEscape(jsNama(s.kode_guru).split(',')[0]) : '') : '—')
-                    : lpEscape(s.kelas || '—');
-                return `<div onclick="jsKlikSlot(${_jsState.semua.indexOf(s)})"
-                    class="rounded-lg border ${w} px-2 py-1.5 min-h-[54px] cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all ${sedang ? 'ring-2 ring-rose-400' : ''}">
-                    <p class="text-[11px] font-black leading-tight line-clamp-2">${lpEscape(s.mapel || '—')}</p>
-                    <p class="text-[9px] font-bold opacity-80 leading-tight truncate">${baris2}</p>
-                </div>`;
-            }).join('');
-        }
+    let html = '';
+    // Baris judul
+    html += '<div style="grid-column:1;grid-row:1"></div>';
+    JADWAL_HARI_ID.forEach((h, i) => {
+        html += `<div style="grid-column:${i + 2};grid-row:1" class="text-center px-2 py-2 rounded-lg text-xs font-black ${i === hariIni ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-500'}">${h}</div>`;
     });
-    html += '</div></div>';
-    return html;
+    // Kolom jam
+    jamList.forEach((j, i) => {
+        html += `<div style="grid-column:1;grid-row:${i + 2}" class="flex flex-col items-center justify-center bg-slate-50 rounded-lg py-1">
+            <span class="text-[10px] font-black text-slate-500">Jam ${j.no}</span>
+            ${j.mulai ? `<span class="text-[9px] font-bold text-slate-400">${lpEscape(j.mulai)}</span>` : ''}
+            ${j.selesai ? `<span class="text-[9px] text-slate-400">${lpEscape(j.selesai)}</span>` : ''}
+        </div>`;
+    });
+
+    const kartu = (e, sedang) => {
+        const s = e.s;
+        const w = warna[s.jenis] || warna.mengajar;
+        const panjang = e.b - e.a + 1;
+        const baris2 = mode === 'kelas'
+            ? (s.kode_guru ? lpEscape(s.kode_guru) + (jsNama(s.kode_guru) ? ' · ' + lpEscape(jsNama(s.kode_guru).split(',')[0]) : '') : '—')
+            : lpEscape(s.kelas || '—');
+        return `<div onclick="jsKlikSlot(${_jsState.semua.indexOf(s)})"
+            class="rounded-lg border ${w} px-2 py-1.5 cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all overflow-hidden ${sedang ? 'ring-2 ring-rose-400' : ''}">
+            <p class="text-[11px] font-black leading-tight line-clamp-2">${lpEscape(s.mapel || '—')}</p>
+            <p class="text-[9px] font-bold opacity-80 leading-tight truncate">${baris2}</p>
+            <p class="text-[8px] font-bold opacity-60 leading-none mt-0.5">${panjang} JP · jam ${lpEscape(s.jam_ke)}</p>
+        </div>`;
+    };
+
+    for (let d = 0; d < 6; d++) {
+        const klaster = _jsSusunHari(slot.filter(s => s.hari_idx === d), idxOf);
+        klaster.forEach(k => {
+            for (let i = k.a; i <= k.b; i++) isiSel.push(d + '|' + i);
+            const tinggi = k.b - k.a + 1;
+            const dalam = k.jalur.map((lane, ji) => lane.map(e => {
+                const j = jamList[e.a], j2 = jamList[e.b];
+                const sedang = d === hariIni && j.mulai <= jamKini && jamKini < j2.selesai;
+                return `<div style="grid-column:${ji + 1};grid-row:${e.a - k.a + 1} / span ${e.b - e.a + 1}">${kartu(e, sedang)}</div>`;
+            }).join('')).join('');
+            html += `<div style="grid-column:${d + 2};grid-row:${k.a + 2} / span ${tinggi}">
+                <div class="grid gap-1 h-full" style="grid-template-rows:repeat(${tinggi},minmax(0,1fr));grid-template-columns:repeat(${k.jalur.length},minmax(0,1fr));">${dalam}</div>
+            </div>`;
+        });
+        // Sel kosong
+        jamList.forEach((j, i) => {
+            if (isiSel.indexOf(d + '|' + i) !== -1) return;
+            const sedang = d === hariIni && j.mulai <= jamKini && jamKini < j.selesai;
+            html += `<div style="grid-column:${d + 2};grid-row:${i + 2}" class="rounded-lg border border-dashed border-slate-200 ${sedang ? 'ring-2 ring-rose-300' : ''}"></div>`;
+        });
+    }
+
+    return `<div class="overflow-x-auto"><div class="min-w-[860px] grid gap-1"
+        style="grid-template-columns:96px repeat(6,1fr);grid-auto-rows:minmax(52px,auto);">${html}</div></div>`;
 }
 
 function jsKlikSlot(idx) {
@@ -134,7 +188,7 @@ function jsRenderTabKelas() {
     if (!daftar.length) { wrap.innerHTML = _jsKosong('jadwal kelas'); return; }
     if (!_jsState.kelas || daftar.indexOf(_jsState.kelas) === -1) _jsState.kelas = daftar[0];
     const slot = _jsState.semua.filter(s => s.sumber === 'kelas' && s.pemilik === _jsState.kelas);
-    wrap.innerHTML = `
+    wrap.innerHTML = _jsPeringatanLama() + `
     <div class="bg-white rounded-2xl border border-slate-200 p-3 flex items-center gap-3 flex-wrap">
         <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Kelas</span>
         <select onchange="_jsState.kelas=this.value; jsRenderTabKelas();"
@@ -163,7 +217,7 @@ function jsRenderTabGuru() {
     const slot = _jsState.semua.filter(s => s.sumber === 'guru' && s.pemilik === _jsState.guru);
     const mengajar = slot.filter(s => s.jenis !== 'piket').length;
     const piket = slot.filter(s => s.jenis === 'piket').length;
-    wrap.innerHTML = `
+    wrap.innerHTML = _jsPeringatanLama() + `
     <div class="bg-white rounded-2xl border border-slate-200 p-3 flex items-center gap-3 flex-wrap">
         <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Guru</span>
         <select onchange="_jsState.guru=this.value; jsRenderTabGuru();"
@@ -215,7 +269,7 @@ function jsRenderTabAvailable() {
         <div>
             <label class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Jam</label>
             <select onchange="_jsState.avJam=this.value; jsRenderTabAvailable();" class="border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                ${jamList.map(j => { const v = j.mulai + '|' + j.selesai; return `<option value="${v}" ${v === st.avJam ? 'selected' : ''}>Jam ${lpEscape(j.jam_ke)} · ${lpEscape(j.mulai)}–${lpEscape(j.selesai)}</option>`; }).join('')}
+                ${jamList.map(j => { const v = j.mulai + '|' + j.selesai; return `<option value="${v}" ${v === st.avJam ? 'selected' : ''}>Jam ke-${j.no} · ${lpEscape(j.mulai)}–${lpEscape(j.selesai)}</option>`; }).join('')}
             </select>
         </div>
         <button onclick="jsAvailableSekarang()" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm"><i data-lucide="clock" class="w-3.5 h-3.5"></i>Sekarang</button>
@@ -243,9 +297,12 @@ function jsRenderTabAvailable() {
         <div class="overflow-x-auto"><table class="w-full text-left border-collapse" style="min-width:560px">
             <thead><tr class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase"><th class="py-2 px-3">Kelas</th><th class="py-2 px-3">Mapel</th><th class="py-2 px-3">Kode</th><th class="py-2 px-3">Guru</th></tr></thead>
             <tbody class="text-xs divide-y divide-slate-100">${
-                _jsState.semua.filter(s => s.sumber === 'kelas' && jsAdalahKelas(s.pemilik) && s.hari_idx === st.avHari && s.jam_mulai === m && s.jam_selesai === sl)
+                // Pelajaran panjang (3-4 JP) ikut terhitung selama jamnya
+                // bersinggungan, bukan hanya yang mulai & selesai persis sama.
+                _jsState.semua.filter(s => s.sumber === 'kelas' && jsAdalahKelas(s.pemilik) &&
+                        s.hari_idx === st.avHari && s.jam_mulai < sl && m < s.jam_selesai)
                     .sort((a, b) => a.pemilik.localeCompare(b.pemilik, 'id', { numeric: true }))
-                    .map(s => `<tr class="hover:bg-slate-50"><td class="py-2 px-3 font-bold text-slate-700">${lpEscape(s.pemilik)}</td><td class="py-2 px-3">${lpEscape(s.mapel || '-')}</td><td class="py-2 px-3 font-mono font-bold text-indigo-600">${lpEscape(s.kode_guru || '-')}</td><td class="py-2 px-3 font-semibold text-slate-700">${lpEscape(jsNama(s.kode_guru) || '-')}</td></tr>`).join('')
+                    .map(s => `<tr class="hover:bg-slate-50"><td class="py-2 px-3 font-bold text-slate-700">${lpEscape(s.pemilik)}</td><td class="py-2 px-3">${lpEscape(s.mapel || '-')}<span class="text-slate-400 font-semibold"> · jam ${lpEscape(s.jam_ke)}</span></td><td class="py-2 px-3 font-mono font-bold text-indigo-600">${lpEscape(s.kode_guru || '-')}</td><td class="py-2 px-3 font-semibold text-slate-700">${lpEscape(jsNama(s.kode_guru) || '-')}</td></tr>`).join('')
                 || '<tr><td colspan="4" class="py-6 text-center text-slate-400 font-semibold">Tidak ada kelas berlangsung pada jam ini.</td></tr>'
             }</tbody>
         </table></div>
@@ -263,6 +320,19 @@ function jsAvailableSekarang() {
     if (k) _jsState.avJam = k.mulai + '|' + k.selesai;
     else alert('Di luar jam pelajaran (' + now + '). Menampilkan jam terdekat.');
     jsRenderTabAvailable();
+}
+
+function _jsPeringatanLama() {
+    if (!_jsState.semua.length || jsAdaTabelJam()) return '';
+    return `<div class="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-start gap-2.5 mb-3">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+        <p class="text-[11px] text-amber-800 font-semibold leading-relaxed">
+            Jadwal ini diimpor dengan versi lama yang menganggap <b>semua pelajaran 2 JP</b>.
+            Pelajaran 1 JP, 3 JP, dan 4 JP masih salah.
+            <button onclick="jsTampilkanTab('impor')" class="underline font-bold hover:text-amber-900">Impor ulang kedua PDF</button>
+            untuk memperbaikinya.
+        </p>
+    </div>`;
 }
 
 function _jsKosong(apa) {
@@ -372,7 +442,7 @@ async function jsSimpanImpor(tipe) {
     const st = document.getElementById('js-status-' + tipe);
     const periode = (document.getElementById('js-periode') || {}).value || '';
     try {
-        await jsGantiJadwal(tipe, hasil.slot, periode, (n, t) => {
+        await jsGantiJadwal(tipe, hasil.slot, periode, hasil.jam, (n, t) => {
             if (st) st.innerHTML = '<span class="text-indigo-600">Menyimpan ' + n + '/' + t + '...</span>';
         });
         alert('✅ Jadwal ' + tipe + ' tersimpan (' + hasil.slot.length + ' slot).');

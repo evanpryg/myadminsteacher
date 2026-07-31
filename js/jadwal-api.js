@@ -3,19 +3,27 @@
 // ============================================================
 
 const JS_PERIODE_KEY = 'GS_JADWAL_PERIODE';
+const JS_JAM_KEY = 'GS_JADWAL_JAM';
 
 let _jsCache = null;          // seluruh slot (dipakai lintas tampilan)
 let _jsPeriode = '';
+let _jsJam = [];              // tabel jam ke-1..8 dari PDF
 
 async function jsMuatSemua(paksa) {
     if (_jsCache && !paksa) return _jsCache;
     const data = await fetchSupabase('/rest/v1/jadwal_sekolah?select=*&order=hari_idx,jam_mulai', 'GET');
     _jsCache = jsSilangkanKelas(data || []);
     try { _jsPeriode = await getAppSetting(JS_PERIODE_KEY, ''); } catch (e) { _jsPeriode = ''; }
+    try { _jsJam = JSON.parse(await getAppSetting(JS_JAM_KEY, '') || '[]'); } catch (e) { _jsJam = []; }
     return _jsCache;
 }
 
 function jsPeriodeAktif() { return _jsPeriode; }
+
+// Tabel jam baru ikut tersimpan sejak parser bisa membaca panjang
+// pelajaran. Kalau belum ada, berarti data yang tersimpan berasal dari
+// impor versi lama yang menganggap semua pelajaran 2 JP.
+function jsAdaTabelJam() { return !!(_jsJam && _jsJam.length >= 4); }
 
 /**
  * Pemulihan silang guru <-> kelas.
@@ -73,7 +81,7 @@ function jsSilangkanKelas(semua) {
 
 // Ganti seluruh jadwal utk satu sumber ('guru'/'kelas') dgn data baru.
 // Dikirim bertahap supaya ribuan baris tidak menabrak batas payload.
-async function jsGantiJadwal(sumber, slot, periode, onProgress) {
+async function jsGantiJadwal(sumber, slot, periode, jam, onProgress) {
     await fetchSupabase('/rest/v1/jadwal_sekolah?sumber=eq.' + encodeURIComponent(sumber), 'DELETE');
     let terkirim = 0;
     for (let i = 0; i < slot.length; i += 200) {
@@ -90,6 +98,7 @@ async function jsGantiJadwal(sumber, slot, periode, onProgress) {
         if (onProgress) onProgress(terkirim, slot.length);
     }
     if (periode) await setAppSetting(JS_PERIODE_KEY, periode);
+    if (jam && jam.length) await setAppSetting(JS_JAM_KEY, JSON.stringify(jam));
     _jsCache = null;
     return terkirim;
 }
@@ -118,11 +127,44 @@ function jsDaftarGuru(semua) {
         (a.nama || a.kode).localeCompare(b.nama || b.kode, 'id', { sensitivity: 'base' }));
 }
 
-// Semua blok waktu unik (utk pemilih jam)
+// "3" -> {dari:3, sampai:3}   "5-7" -> {dari:5, sampai:7}
+function jsRentangJam(jamKe) {
+    const m = String(jamKe || '').split('-');
+    const a = parseInt(m[0], 10);
+    if (!a) return null;
+    const b = m.length > 1 ? parseInt(m[1], 10) : a;
+    return { dari: a, sampai: (b && b >= a) ? b : a };
+}
+
+function jsPanjangJam(jamKe) {
+    const r = jsRentangJam(jamKe);
+    return r ? (r.sampai - r.dari + 1) : 1;
+}
+
+// Daftar JAM PELAJARAN (bukan blok 2 jam-an): satu baris per jam ke-1..8.
+// Panjang pelajaran tidak seragam -- ada yang 1 JP, ada yang 3 JP -- jadi
+// baris tabel harus per jam, bukan per pasangan.
 function jsDaftarJam(semua) {
-    const map = {};
-    semua.forEach(s => { map[s.jam_mulai + '-' + s.jam_selesai] = { mulai: s.jam_mulai, selesai: s.jam_selesai, jam_ke: s.jam_ke }; });
-    return Object.values(map).sort((a, b) => a.mulai.localeCompare(b.mulai));
+    // Tabel jam dari PDF selalu lebih tepat daripada hasil terkaan.
+    if (_jsJam && _jsJam.length >= 4) return _jsJam.slice();
+    const peta = {};
+    semua.forEach(s => {
+        const r = jsRentangJam(s.jam_ke);
+        if (!r) return;
+        for (let n = r.dari; n <= r.sampai; n++) {
+            if (!peta[n]) peta[n] = { no: n, mulai: '', selesai: '' };
+        }
+        if (!peta[r.dari].mulai) peta[r.dari].mulai = s.jam_mulai;
+        if (!peta[r.sampai].selesai) peta[r.sampai].selesai = s.jam_selesai;
+    });
+    const out = Object.keys(peta).map(k => peta[k]).sort((a, b) => a.no - b.no);
+    // Jam yang tidak pernah menjadi awal/akhir pelajaran manapun jamnya
+    // diisi dari tetangganya supaya pemilih jam tidak kosong.
+    out.forEach((j, i) => {
+        if (!j.mulai && i > 0) j.mulai = out[i - 1].selesai;
+        if (!j.selesai && i + 1 < out.length) j.selesai = out[i + 1].mulai;
+    });
+    return out;
 }
 
 function jsHariIniIdx() {
